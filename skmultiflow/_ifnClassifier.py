@@ -102,6 +102,15 @@ def drop_records(X, atr_index, y, node_index):
             new_y.append(y[i])
     return np.array(new_x), np.array(new_y)
 
+def _processData(X, y):
+    """
+
+    :param X:
+    :param y:
+    :return:
+    """
+    return 0
+
 
 class IfnClassifier():
     attributes_array = []
@@ -124,7 +133,7 @@ class IfnClassifier():
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
 
-    def fit(self, X, y, cols):
+    def fit(self, X, y):
         """A reference implementation of a fitting function.
 
         Parameters
@@ -140,6 +149,7 @@ class IfnClassifier():
             Returns self.
         """
         start = time.time()
+        cols = list(X.columns.values)
         f = open("output.txt", "w+")
         f.write('Output data for dataset: \n\n')
 
