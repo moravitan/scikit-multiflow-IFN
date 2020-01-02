@@ -1,49 +1,49 @@
 import pandas as pd
-
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
 
 from skmultiflow import IfnClassifier
+from skmultiflow import _csvConveter
 from skmultiflow._dataProcessing import DataProcessor
 
-clf = IfnClassifier(0.95)
+clf = IfnClassifier(0.99)
 
-file_path = "dataset.csv"
 
-# df = pd.read_csv(file_path)
-# y = df['Class'].values
-# X = df.drop(['Class'], axis = 1)
+def test_old_version(file_path_train, file_path_test):
+    data = _csvConveter.CsvConverter.convert(file_path_train)
+    # ADD COLS TO FIT FUNCTION IN _ifnClassifier
+    clf.fit(data[0], data[1], data[2])
+    clf.add_training_set_error_rate(data[0], data[1])
+    clf.network.create_network_structure_file()
 
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1)
+    z = _csvConveter.CsvConverter.convert_predict(file_path_test)
 
-dp = DataProcessor()
+    y_pred = clf.predict(z)
 
-X_train, X_test, y_train, y_test = dp.convert(file_path, 0.3)
+    # print("accuracy", accuracy_score(z, y_pred))
 
-clf.fit(X_train, y_train)
+    #print(clf.predict_proba(z))
 
-X_without_cols_name = []
-for index, row in X_train.iterrows():
-    # insert each sample in df to x
-    record = [elem for elem in row]
-    X_without_cols_name.append(record)
 
-clf.add_training_set_error_rate(X_without_cols_name, y_train)
-
-clf.network.create_network_structure_file()
+#test_old_version("datasets/Credit_full.csv", "datasets/pred_credit.csv")
+# test_old_version("datasets/Glass_train.csv", "datasets/Glass_test.csv")
 
 
 
 
-#z = _csvConveter.CsvConverter.convert_predict("Chess_test.csv")
-# -------------- predict will return the classes and write it to file --------------
+def test_with_dataProcessing(file_path):
+    clf = IfnClassifier(0.9)
+    dp = DataProcessor()
+    X_train, X_test, y_train, y_test = dp.convert(file_path, 0.2)
 
-y_pred = clf.predict(X_test)
+    clf.fit(X_train, y_train)
 
-#print(y_pred)
+    clf.add_training_set_error_rate(X_train, y_train)
 
-print(accuracy_score(y_test, y_pred))
+    clf.network.create_network_structure_file()
 
-# -------------- predict_proba will return the probability for every class and write it to file --------------
-print(clf.predict_proba(X_test))
+    y_pred = clf.predict(X_test)
+    print("accuracy", accuracy_score(y_test, y_pred))
 
+    #print(clf.predict_proba(X_test))
+
+test_with_dataProcessing("datasets/dataset.csv")
