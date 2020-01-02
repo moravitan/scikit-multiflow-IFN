@@ -102,14 +102,18 @@ def drop_records(X, atr_index, y, node_index):
             new_y.append(y[i])
     return np.array(new_x), np.array(new_y)
 
-def _processData(X, y):
+
+def _convert_X(X):
     """
 
-    :param X:
-    :param y:
-    :return:
+    :param X: {array-like, sparse matrix}, shape (n_samples, n_features)
+    :return: {list} of X
     """
-    return 0
+    x = []
+    for index, row in X.iterrows():
+        # insert each sample in df to x
+        x.append([elem for elem in row])
+    return x
 
 
 class IfnClassifier():
@@ -152,7 +156,7 @@ class IfnClassifier():
         cols = list(X.columns.values)
         f = open("output.txt", "w+")
         f.write('Output data for dataset: \n\n')
-
+        #X = _convert_X(X)
         # check_X_y - scikit-learn function.
         # includes multi_output param (can be assign to True while implementing multi label
         X, y = check_X_y(X, y, accept_sparse=True)
@@ -626,9 +630,11 @@ class IfnClassifier():
         return np.array(predicted)
 
     def add_training_set_error_rate(self, x, y):
+        #x = _convert_X(x)
         correct = 0
         for i in range(len(y)):
-            predicted_value = self.predict([x[i]])[0]
+            # predicted_value = self.predict([x[i]])[0]
+            predicted_value = self.predict(x.iloc[[i]])[0]
             if predicted_value == y[i]:
                 correct += 1
 

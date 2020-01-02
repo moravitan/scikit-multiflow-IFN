@@ -1,4 +1,5 @@
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 """
 NOTES:
@@ -22,7 +23,7 @@ class CsvConverter:
         for index, row in df.iterrows():
             # insert each sample in df to x
             record = [elem for elem in row]
-            x.append(record)
+            x.append([elem for elem in row])
 
         return x, y, cols
 
