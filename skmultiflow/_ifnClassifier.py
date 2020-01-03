@@ -221,7 +221,7 @@ class IfnClassifier():
 
             # check if attribute is continuous
 
-            if len(np.unique(attribute_data)) == 2 or 'category' in columns_type[attribute]:
+            if len(np.unique(attribute_data)) == 10 or 'category' in columns_type[attribute]:
                 continuous_attributes_type[attribute] = False
             else:
                 continuous_attributes_type[attribute] = True
@@ -281,8 +281,7 @@ class IfnClassifier():
 
         # if chosen att is continuous we convert the partial x values their positions by the splits values
         if continuous_attributes_type[chosen_attribute]:
-            unique_values_per_attribute[chosen_attribute] = np. \
-                arange(len(split_points[chosen_attribute]) + 1)
+            unique_values_per_attribute[chosen_attribute] = np.arange(len(split_points[chosen_attribute]) + 1)
 
             split_points[chosen_attribute].sort()
 
@@ -649,13 +648,13 @@ class IfnClassifier():
         error_rate = (len(y) - correct) / len(y)
         with open('output.txt', 'a') as f:
             f.write("\nError rate is: " + str(round(error_rate, 3)))
+            f.close()
 
 
 
 def first_loop_recursive_split_points(sub_interval, attribute, self):
     """
     function for continuous feature only
-    MOR - why recursive?
     :param sub_interval: data frame of <value,class>
     :param attribute: column index of a feature
     :param self:
@@ -720,6 +719,7 @@ def first_loop_recursive_split_points(sub_interval, attribute, self):
             first_loop_recursive_split_points(sub_interval_0, attribute, self)
         if len(sub_interval_1) > 0:
             first_loop_recursive_split_points(sub_interval_1, attribute, self)
+
 
 
 def recursive_split_points(sub_interval, attribute, self, nodes,distinct_attribute_data):
