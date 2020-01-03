@@ -30,10 +30,10 @@ def test_old_version(file_path_train, file_path_test):
 
 
 
-def test_with_dataProcessing(file_path):
-    clf = IfnClassifier(0.9)
+def test_with_dataProcessing(file_path, test_size):
+    clf = IfnClassifier(0.99)
     dp = DataProcessor()
-    X_train, X_test, y_train, y_test = dp.convert(file_path, 0.2)
+    X_train, X_test, y_train, y_test = dp.convert(file_path, test_size)
 
     clf.fit(X_train, y_train)
 
@@ -46,4 +46,4 @@ def test_with_dataProcessing(file_path):
 
     #print(clf.predict_proba(X_test))
 
-test_with_dataProcessing("datasets/dataset.csv")
+test_with_dataProcessing("datasets/dataset.csv", 0.2)

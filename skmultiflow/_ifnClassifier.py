@@ -137,6 +137,10 @@ class IfnClassifier():
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
 
+    def _is_numeric(self, X):
+        if len(np.unique(X)) == 2:
+            return False
+
     def fit(self, X, y):
         """A reference implementation of a fitting function.
 
@@ -156,7 +160,10 @@ class IfnClassifier():
         cols = list(X.columns.values)
         f = open("output.txt", "w+")
         f.write('Output data for dataset: \n\n')
-        #X = _convert_X(X)
+        columns_type = []
+        for dt in X.dtypes:
+            columns_type.append(str(dt))
+
         # check_X_y - scikit-learn function.
         # includes multi_output param (can be assign to True while implementing multi label
         X, y = check_X_y(X, y, accept_sparse=True)
@@ -213,7 +220,8 @@ class IfnClassifier():
             unique_values_per_attribute[attribute] = np.unique(attribute_data)
 
             # check if attribute is continuous
-            if len(unique_values_per_attribute[attribute]) / len(attribute_data) < 0.03:
+
+            if len(np.unique(attribute_data)) == 2 or 'category' in columns_type[attribute]:
                 continuous_attributes_type[attribute] = False
             else:
                 continuous_attributes_type[attribute] = True

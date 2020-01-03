@@ -78,7 +78,7 @@ class IfnNetwork:
                 self.target_layer.append(ClassNode(i))
 
     def create_network_structure_file(self):
-        f = open("network_structure_py.txt", "w+")
+        f = open("network_structure.txt", "w+")
         f.write("Network Structure:" + "\n\n")
 
         curr_layer = self.root_node.first_layer
