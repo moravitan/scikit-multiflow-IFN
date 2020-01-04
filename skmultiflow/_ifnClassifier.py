@@ -11,6 +11,7 @@ import math
 import collections
 import time
 import sys
+import pandas as pd
 
 
 def calc_MI(x, y, total_records):
@@ -161,8 +162,14 @@ class IfnClassifier():
         f = open("output.txt", "w+")
         f.write('Output data for dataset: \n\n')
         columns_type = []
-        for dt in X.dtypes:
-            columns_type.append(str(dt))
+        # for dt in X.dtypes:
+        #    columns_type.append(str(dt))
+
+        for dt in X.columns:
+            if len(np.unique(X[dt])) > 10:
+                columns_type.append(str(X[dt].dtype))
+            else:
+                columns_type.append("category")
 
         # check_X_y - scikit-learn function.
         # includes multi_output param (can be assign to True while implementing multi label
@@ -214,14 +221,18 @@ class IfnClassifier():
             Maybe can be simplified by using pandas.
             for each attribute extract the entire col
             """
-            for record in X:
-                attribute_data.append(record[attribute])
+            #for record in X: #REFACTORED
+            #    attribute_data.append(record[attribute])
+            """ OMRI
+            Done what MOR wrote
+            """
+            attribute_data = list(X[:, attribute])
 
             unique_values_per_attribute[attribute] = np.unique(attribute_data)
 
             # check if attribute is continuous
 
-            if len(np.unique(attribute_data)) == 10 or 'category' in columns_type[attribute]:
+            if len(np.unique(attribute_data)) <= 10 or 'category' in columns_type[attribute]:
                 continuous_attributes_type[attribute] = False
             else:
                 continuous_attributes_type[attribute] = True
@@ -229,9 +240,10 @@ class IfnClassifier():
 
             # if feature is of type continuous
             if continuous_attributes_type[attribute]:
-                data_class_array = []
-                for i in range(len(attribute_data)):
-                    data_class_array.append((attribute_data[i], y[i]))
+                data_class_array = list(zip(attribute_data, y))
+                # data_class_array = []
+                # for i in range(len(attribute_data)):
+                #    data_class_array.append((attribute_data[i], y[i]))
                 data_class_array.sort(key=lambda tup: tup[0])
 
                 nodes_info_per_attribute[attribute] = []
@@ -243,7 +255,7 @@ class IfnClassifier():
                 else:
                     sum_of_splits = sum([pair[1] for pair in nodes_info_per_attribute[attribute]])
                     attributes_mi[attribute] = sum_of_splits
-            # categorical feature
+            # categorial feature
             else:
                 mutual_info_score = calc_MI(attribute_data, y, total_records)
                 statistic = 2 * np.log(2) * total_records * mutual_info_score
@@ -587,6 +599,7 @@ class IfnClassifier():
             for row in predicted:
                 f.write(str(index) + '. ' + str(row) + '\n')
                 index += 1
+        f.close()
 
         return np.array(predicted)
 
@@ -633,6 +646,7 @@ class IfnClassifier():
             for row in predicted:
                 f.write(str(index) + '. ' + str(row) + '\n')
                 index += 1
+        f.close()
 
         return np.array(predicted)
 

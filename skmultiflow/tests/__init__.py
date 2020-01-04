@@ -4,6 +4,7 @@ from sklearn.metrics import accuracy_score
 from skmultiflow import IfnClassifier
 from skmultiflow import _csvConveter
 from skmultiflow._dataProcessing import DataProcessor
+import pickle
 
 clf = IfnClassifier(0.99)
 
@@ -28,8 +29,6 @@ def test_old_version(file_path_train, file_path_test):
 # test_old_version("datasets/Glass_train.csv", "datasets/Glass_test.csv")
 
 
-
-
 def test_with_dataProcessing(file_path, test_size):
     clf = IfnClassifier(0.9)
     dp = DataProcessor()
@@ -44,6 +43,7 @@ def test_with_dataProcessing(file_path, test_size):
     y_pred = clf.predict(X_test)
     print("accuracy", accuracy_score(y_test, y_pred))
 
-    #print(clf.predict_proba(X_test))
+    # print(clf.predict_proba(X_test))
+
 
 test_with_dataProcessing("datasets/Glass.csv", 0.3)
