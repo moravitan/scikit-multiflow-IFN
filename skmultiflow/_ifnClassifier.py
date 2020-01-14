@@ -280,6 +280,7 @@ class IfnClassifier():
 
         if chosen_attribute != -1:
             f.write('\nChosen attribute is: ' + cols[chosen_attribute] + "(" + str(chosen_attribute) + ")" + '\n\n')
+            # f.write('\nSplit points are: ' + str(split_points[chosen_attribute]) + '\n\n')
         else:
             f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute) + ")" + '\n\n')
 
@@ -403,8 +404,7 @@ class IfnClassifier():
                             # If the node z is split by the threshold T max, mark the node as split
                             if node.index in attribute_node_mi_data[attribute].keys():
                                 if split_point in attribute_node_mi_data[attribute][node.index].keys():
-                                    node_info_tuple = (
-                                        node.index, attribute_node_mi_data[attribute][node.index][split_point])
+                                    node_info_tuple = (node.index, attribute_node_mi_data[attribute][node.index][split_point])
                                     nodes_info_per_attribute[attribute].append(node_info_tuple)
 
                                 else:
@@ -467,6 +467,9 @@ class IfnClassifier():
 
             if chosen_attribute != -1:
                 f.write('\nChosen attribute is: ' + cols[chosen_attribute] + "(" + str(chosen_attribute) + ")" + '\n\n')
+                # f.write('\nSplit points are: ' + str(split_points[chosen_attribute]) + '\n\n')
+
+
             else:
                 f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute) + ")" + '\n\n')
 
@@ -599,7 +602,7 @@ class IfnClassifier():
             for row in predicted:
                 f.write(str(index) + '. ' + str(row) + '\n')
                 index += 1
-        f.close()
+            f.close()
 
         return np.array(predicted)
 
@@ -646,12 +649,11 @@ class IfnClassifier():
             for row in predicted:
                 f.write(str(index) + '. ' + str(row) + '\n')
                 index += 1
-        f.close()
+            f.close()
 
         return np.array(predicted)
 
     def add_training_set_error_rate(self, x, y):
-        #x = _convert_X(x)
         correct = 0
         for i in range(len(y)):
             # predicted_value = self.predict([x[i]])[0]
