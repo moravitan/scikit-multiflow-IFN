@@ -55,16 +55,19 @@ class HiddenLayer:
         self.next_layer = None
         self.nodes = None
         self.is_continuous = False
+        self.split_points = []
 
     def set_nodes(self, nodes):
         self.nodes = nodes
-
 
     def get_node(self, index):
         for node in self.nodes:
             if node.index == index:
                 return node
         return None
+
+    def get_nodes(self):
+        return self.nodes
 
 
 class IfnNetwork:
