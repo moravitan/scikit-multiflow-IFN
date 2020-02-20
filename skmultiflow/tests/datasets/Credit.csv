@@ -1,5 +1,6 @@
 Sex,Age,Mean_T_Add,Home_status,Occupation,Job_status,Time_employ,Other_inves,Bank_accoun,Time_w_bank,Liability,Account,Housing_exp,Balance,Class
-1,22.08,11.46,2,4,4,1.585,0,0,0,1,2,100,1213,0
+"1
+",22.08,11.46,2,4,4,1.585,0,0,0,1,2,100,1213,0
 0,22.67,7,2,8,4,0.165,0,0,0,0,2,160,1,0
 0,29.58,1.75,1,4,4,1.25,0,0,0,1,2,280,1,0
 0,21.67,11.5,1,5,3,0,1,1,11,1,2,0,1,1
