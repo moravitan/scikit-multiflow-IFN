@@ -21,7 +21,7 @@ class ClassNode(Node):
 
 
 class AttributeNode(Node):
-    def __init__(self, index, inner_index, prev_node, layer, partial_x, partial_y, is_terminal=False):
+    def __init__(self, index, attribute_value, prev_node, layer, partial_x, partial_y, is_terminal=False):
         """
 
         :param index: of the node
@@ -33,7 +33,7 @@ class AttributeNode(Node):
         :param is_terminal: false if the node isn't terminal
         """
         super().__init__(index)
-        self.inner_index = inner_index
+        self.attribute_value = attribute_value
         self.prev_node = prev_node
         self.layer = layer
         self.is_terminal = is_terminal

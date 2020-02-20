@@ -1,5 +1,5 @@
 """
-Author: Gil Rotem and Tzuriel Hagian
+Author: Mor Avitan, Itay Carmi and Omri Naor
 Original code and method by: Prof' Mark Last
 License: BSD 3 clause
 """
@@ -11,115 +11,258 @@ import math
 import collections
 import time
 import sys
-import pandas as pd
 
 
-def calc_MI(x, y, total_records):
+def _binary_search(array, left, right, value):
     """
 
-    :param x:
-    :param y:
-    :param total_records:
-    :return:
-    """
-    partial_records = len(y)
-    # count the number of classes (0 and 1)
-    unique, counts = np.unique(np.array(y), return_counts=True)
-    # <class, number_of_appearances>
-    class_count = np.asarray((unique, counts)).T
-    # count the number of distinct values in x
-    unique, counts = np.unique(np.array(x), return_counts=True)
-    # <value, number_of_appearances>
-    data_count = np.asarray((unique, counts)).T
-    data_dic = collections.defaultdict(int)
+    Parameters
+    ----------
+    array: (An array_like object of length n)
+        A sorted array of int/float.
 
-    # count the number of appearances for each tuple x[i],y[i]
-    for i in range(len(y)):
-        data_class_tuple = x[i], y[i]
-        data_dic[data_class_tuple] = data_dic[data_class_tuple] + 1
+    left: int
+        Index in the array.
 
-    total_mi = 0
+    right: int
+        Index in the array.
 
-    # for each data-class
-    # key = [feature_value,class]
-    for key, value in data_dic.items():
-        # for each class
-        curr_class_count = None
-        for c_count in class_count:
-            if c_count[0] == key[1]:
-                curr_class_count = c_count[1]
-
-        # for each data
-        curr_data_count = None
-        for d_count in data_count:
-            if d_count[0] == key[0]:
-                curr_data_count = d_count[1]
-
-        joint = value / total_records
-        cond = value / partial_records
-        cond_x = curr_data_count / partial_records
-        cond_y = curr_class_count / partial_records
-
-        mutual_information = joint * math.log(cond / (cond_x * cond_y), 2)
-
-        total_mi += mutual_information
-    return total_mi
+    value: int/float
+        The value needed to be founded in the array.
 
 
-def calc_weight(y, class_count, total_records):
+    Returns
+    -------
+        The index of the value in the array.
+
+
     """
 
-    :param y: class
-    :param class_count: tuple <class, number_of_appearances>
-    :param total_records: number of records
-    :return:
-    """
-    weight_per_class = {}
-    for class_info in class_count:
-        # partial_y = np.extract(y, np.where(y == [class_info[0]]), axis=0)
-        cut_len = len(np.extract(y == [class_info[0]], y))
-        if cut_len != 0:
-            weight = (cut_len / total_records) * (math.log((cut_len / len(y)) / (class_info[1] / total_records), 2))
-            weight_per_class[class_info[0]] = (weight, (cut_len / len(y)))
+    # Check base case
+    if right >= left:
+        mid = int(left + (right - left) / 2)
+        # If element is present at the middle itself
+        if array[mid] == value:
+            return mid
+        # If element is smaller than mid, then it can only
+        # be present in left subarray
+        elif array[mid] > value:
+            return _binary_search(array, left, mid - 1, value)
+        # Else the element can only be present in right subarray
         else:
-            weight_per_class[class_info[0]] = (0, 0)
-    return weight_per_class
+            return _binary_search(array, mid + 1, right, value)
+    else:
+        # Element is not present in the array
+        return -1
 
 
-def drop_records(X, atr_index, y, node_index):
+def _split_data_to_two_intervals(interval, T, min_value, max_value):
+    """ Splitting the given interval to two intervals.
+        One interval contains all the data which is smaller than T (will be referred as left interval).
+        while the second interval contain all the data which is equal or larger than T (will be referred as right
+        interval)
+
+    Parameters
+    ----------
+    interval: {array-like, sparse matrix}, shape (n_samples, n_classes)
+        Contains the data of one feature overall samples in the train set.
+
+    T: int or float
+        Threshold point
+
+    min_value: int or float
+        minimum value in the interval
+
+    max_value: int or float
+        maximum value in the interval
+
+    Returns
+    -------
+        An array_like object of length n_samples contains 0's equal to the number of values which are smaller than
+        T and 1's equal to the number of values which are equal of larger than T.
+        An array_like object of length n_samples which contains the true class labels for all the samples in the
+        interval.
     """
+    t_attribute_data = []
+    new_y = []
 
-    :param X: records from data frame
-    :param atr_index: feature index
-    :param y: class
-    :param node_index: unique value in X[][atr_index]
-    :return:
+    interval.sort(key=lambda tup: tup[0])
+
+    for data_class_tuple in interval:
+        if min_value <= data_class_tuple[0] <= max_value:
+            new_y.append(data_class_tuple[1])
+            if data_class_tuple[0] < T:
+                t_attribute_data.append(0)
+            else:
+                t_attribute_data.append(1)
+
+    return t_attribute_data, new_y
+
+
+def _find_split_position(value, positions):
+    """ Find the position of the given value between the list of given positions.
+
+    Parameters
+    ----------
+    value: int or float
+        A value of the chosen attribute upon the current layer in the network will be splited by.
+
+    positions: (An array_like object of length n)
+        List of the chosen split points which founded significant for the chosen attribute upon the current
+        layer in the network will be splited by.
+
+
+    Returns
+    -------
+        The position after discretization of the given value among the positions list.
+
+    """
+    # If value is smaller than the first split point
+    if value < positions[0]:
+        return 0
+    # If value is equal/larger than the first split point
+    if positions[len(positions) - 1] <= value:
+        return len(positions)
+
+    for i in range(len(positions)):
+        first_position = positions[i]
+        second_position = positions[i + 1]
+        if first_position <= value < second_position:
+            return i + 1
+
+
+def _write_details_to_file(layer_position, attributes_cmi, chosen_attribute_index, chosen_attribute):
+    """ Write network details to a file name 'output.txt'.
+
+    Parameters
+    ----------
+    layer_position: string
+        current layer position in the network - first/next.
+
+    attributes_cmi: (dictionary) {attribute_index : conditional mutual information}
+        Contains the conditional mutual information of each attribute.
+
+    chosen_attribute_index: int or float
+        The chosen attribute index upon the network will be splited by.
+
+    chosen_attribute: string
+        The chosen attribute name upon the network will be splited by.
+
+
+
+    """
+    with open('output.txt', 'a') as f:
+        f.write(layer_position + ' layer attribute: \n')
+        for index, mi in attributes_cmi.items():
+            f.write(str(index) + ': ' + str(round(mi, 3)) + '\n')
+
+        if chosen_attribute_index != -1:
+            f.write('\nChosen attribute is: ' + chosen_attribute + "(" + str(chosen_attribute_index) + ")" + '\n\n')
+            # f.write('\nSplit points are: ' + str(split_points[chosen_attribute]) + '\n\n')
+        else:
+            f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute_index) + ")" + '\n\n')
+        f.close()
+
+
+def _drop_records(X, y, attribute_index, value):
+    """ Drop the samples in X which doesn't equal to value.
+
+    Parameters
+    ----------
+    x: {array-like, sparse matrix}, shape (n_samples, n_features)
+        The samples from a specific node.
+
+    y: (An array_like object of length n_samples)
+        Contains the true class labels for all the samples in X.
+
+    attribute_index: int
+        The index of the attribute upon the network will be splited by.
+
+    value: int or float
+        The data value to keep in x.
+
+
+    Returns
+    -------
+        np.array of the samples which their data value in attribute_index is equal to value.
+
     """
     new_x = []
     new_y = []
     for i in range(len(y)):
-        if X[i][atr_index] == node_index:
+        if X[i][attribute_index] == value:
             new_x.append(X[i])
             new_y.append(y[i])
     return np.array(new_x), np.array(new_y)
 
 
-def _convert_X(X):
+def _create_attribute_node(partial_X, partial_y, chosen_attribute_index, attribute_value, curr_node_index,
+                           prev_node_index):
+    """ Create an AttributeNode object which contain the partial_X and partial_y given.
+
+    Parameters
+    ----------
+    partial_X: {array-like, sparse matrix}, shape (n_samples, n_features)
+        Contains a partial samples from the train set.
+
+    partial_y: (An array_like object of length n_samples)
+        Contains the true class labels for all the samples in partial_X.
+
+    chosen_attribute_index: int
+        The chosen attribute index upon the node will be splited by.
+
+    attribute_value: int
+        The data value of the chosen attribute in this node.
+
+    curr_node_index: int
+        The index of the new AttributeNode which will be created
+
+    prev_node_index: int
+        The index of the previous node.
+
+    Returns
+    -------
+        A new AttributeNode object initial with the given parameters.
     """
 
-    :param X: {array-like, sparse matrix}, shape (n_samples, n_features)
-    :return: {list} of X
+    # Drop records where their value in chosen_attribute isn't equal to attribute_value
+    x_y_tuple = _drop_records(X=partial_X,
+                              y=partial_y,
+                              attribute_index=chosen_attribute_index,
+                              value=attribute_value)
+    # Create a new AttributeNode
+    attributes_node = AttributeNode(index=curr_node_index,
+                                    attribute_value=attribute_value,
+                                    prev_node=prev_node_index,
+                                    layer=chosen_attribute_index,
+                                    partial_x=x_y_tuple[0],
+                                    partial_y=x_y_tuple[1])
+    return attributes_node
+
+
+def _get_columns_type(X):
+    """ Finding the type of each column in X
+
+    Parameters
+    ----------
+    x: {array-like, sparse matrix}, shape (n_samples, n_features)
+        The samples in the train set.
+
+    Returns
+    -------
+        An array_like object of length n contains in each position the type of the corresponding attribute in X.
+
     """
-    x = []
-    for index, row in X.iterrows():
-        # insert each sample in df to x
-        x.append([elem for elem in row])
-    return x
+    columns_type = []
+    for dt in X.columns:
+        if len(np.unique(X[dt])) > 10:
+            columns_type.append(str(X[dt].dtype))
+        else:
+            columns_type.append("category")
+    return columns_type
 
 
 class IfnClassifier():
-    attributes_array = []
-    update_attributes_array = []
     """ A template estimator to be used as a reference implementation.
 
     For more information regarding how to build your own estimator, read more
@@ -127,437 +270,228 @@ class IfnClassifier():
 
     Parameters
     ----------
-    alpha : float, default='0.99'
+    alpha: float, default='0.99'
         A parameter used for the significance level of the likelihood-ratio tests.
+
+    max_number_of_layers: int, default=math.inf
+        The maximum number of layers the network will have.
     """
 
-    def __init__(self, alpha=0.99):
+    def __init__(self, alpha=0.99, max_number_of_layers=math.inf):
         if 0 <= alpha < 1:
             self.alpha = alpha
+            self.max_number_of_layers = max_number_of_layers
+            self.total_records = 0
+            # Number of classes in the target
+            self.num_of_classes = 0
+            # Dictionary that contains the unique value for each attribute
+            self.unique_values_per_attribute = {}
+            # Dictionary that contains all the split points for each attribute
+            self.split_points = {}
+            # Dictionary that contains for each node and attribute all the split points founded significant
+            self.nodes_splited_per_attribute = {}
+            # Dictionary that contains for each numeric attribute it's data interval
+            self.intervals_per_attribute = {}
+            # array-like that contains for each group of split points the nodes founded significant and the
+            # conditional mutual information.
+            # Example: [[frozenset: {'1,7,10'}, list<AttributeNode>, float: conditional mutual information]..]
+            self.splited_nodes_by_split_points = []
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
 
-    def _is_numeric(self, X):
-        if len(np.unique(X)) == 2:
-            return False
+    # def _is_numeric(self, X):
+    #     if len(np.unique(X)) == 2:
+    #         return False
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
         """A reference implementation of a fitting function.
 
         Parameters
         ----------
         X : {array-like, sparse matrix}, shape (n_samples, n_features)
-            The training input samples.
+            The training input samples upon which the transforms/estimator will create their model.
         y : array-like, shape = [n_samples]
             The target values.
 
         Returns
         -------
-        self : object
-            Returns self.
+            self
         """
         start = time.time()
-        cols = list(X.columns.values)
-        f = open("output.txt", "w+")
-        f.write('Output data for dataset: \n\n')
-        columns_type = []
-        # for dt in X.dtypes:
-        #    columns_type.append(str(dt))
-
-        for dt in X.columns:
-            if len(np.unique(X[dt])) > 10:
-                columns_type.append(str(X[dt].dtype))
-            else:
-                columns_type.append("category")
-
-        # check_X_y - scikit-learn function.
-        # includes multi_output param (can be assign to True while implementing multi label
-        X, y = check_X_y(X, y, accept_sparse=True)
         print('Building the network...')
-        global total_records
-        global all_nodes_continuous_atts_data
-        global attribute_node_mi_data
-        global nodes_info_per_attribute
-        global split_points
-        global num_of_classes
-        global unique_values_per_attribute
-        global all_continuous_vars_data
-        global is_two_classes
-        total_records = len(y)
+
+
+        cols = list(X.columns.values)
+        columns_type = _get_columns_type(X)
+
+        X, y = check_X_y(X, y, accept_sparse=True)
+
+        self.total_records = len(y)
         unique, counts = np.unique(np.array(y), return_counts=True)
         class_count = np.asarray((unique, counts)).T
+        self.num_of_classes = len(unique)
 
-        nodes_info_per_attribute = {}
-        # map that contains all the split points for all attributes
-        split_points = {}
+        # create list the holds the attributes indexes
+        attributes_indexes = list(range(0, len(X[0])))
 
-        # continuous and categorical attributes
-        continuous_attributes_type = {}
-
-        # create list of all attributes
-        updated_attributes_array = list(range(0, len(X[0])))
-
-        f.write('Total instances: ' + str(total_records) + '\n')
-        f.write('Number of candidate input attributes is: ' + str(len(updated_attributes_array)) + '\n')
-        f.write('Minimum confidence level is: ' +str( self.alpha) + '\n\n')
-        num_of_classes = len(np.unique(y))
-
-        if num_of_classes == 2:
-            is_two_classes = True
-        else:
-            is_two_classes = False
-
-        self.network.build_target_layer(np.unique(y))
-
-        attributes_mi = {}
-        unique_values_per_attribute = {}
+        layer = 'first'
+        number_of_layers = 0
         curr_node_index = 1
+        current_layer = None
 
-        # get the attribute that holds the maximal mutual information
-        for attribute in updated_attributes_array:
-            attribute_data = []
-            """ MOR
-            Maybe can be simplified by using pandas.
-            for each attribute extract the entire col
-            """
-            #for record in X: #REFACTORED
-            #    attribute_data.append(record[attribute])
-            """ OMRI
-            Done what MOR wrote
-            """
-            attribute_data = list(X[:, attribute])
+        self.network.build_target_layer(unique)
 
-            unique_values_per_attribute[attribute] = np.unique(attribute_data)
+        # Define for each numeric attribute it's interval for the discretization procedure
+        self.intervals_per_attribute = self._define_interval_for_numeric_feature(X, y, attributes_indexes, columns_type)
 
-            # check if attribute is continuous
+        significant_attributes_per_node = {}
 
-            if len(np.unique(attribute_data)) <= 10 or 'category' in columns_type[attribute]:
-                continuous_attributes_type[attribute] = False
+        with open("output.txt", "w+") as f:
+            f.write('Output data for dataset: \n\n')
+            f.write('Total instances: ' + str(self.total_records) + '\n')
+            f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
+            f.write('Minimum confidence level is: ' + str(self.alpha) + '\n\n')
+            f.close()
+
+        # Build the network while:
+        # 1. The maximum number of hidden layers is not exceeded
+        # 2. There are more attribute to split the network by them
+        while len(attributes_indexes) > 0 and number_of_layers < self.max_number_of_layers:
+            chosen_split_points = []
+            if current_layer is not None:
+                global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
+                    self._choose_split_attribute(attributes_indexes=attributes_indexes,
+                                                 columns_type=columns_type,
+                                                 nodes=current_layer.get_nodes())
+            # first layer
             else:
-                continuous_attributes_type[attribute] = True
-                split_points[attribute] = []
+                global_chosen_attribute, attributes_mi, not_relevant = \
+                    self._choose_split_attribute(attributes_indexes=attributes_indexes,
+                                                 columns_type=columns_type,
+                                                 X=X,
+                                                 y=y)
 
-            # if feature is of type continuous
-            if continuous_attributes_type[attribute]:
-                data_class_array = list(zip(attribute_data, y))
-                # data_class_array = []
-                # for i in range(len(attribute_data)):
-                #    data_class_array.append((attribute_data[i], y[i]))
-                data_class_array.sort(key=lambda tup: tup[0])
-
-                nodes_info_per_attribute[attribute] = []
-                nodes_info_per_attribute[attribute].append((0, 0))
-                first_loop_recursive_split_points(data_class_array, attribute, self)
-
-                if not bool(split_points[attribute]):  # there are not split points
-                    attributes_mi[attribute] = 0
-                else:
-                    sum_of_splits = sum([pair[1] for pair in nodes_info_per_attribute[attribute]])
-                    attributes_mi[attribute] = sum_of_splits
-            # categorial feature
-            else:
-                mutual_info_score = calc_MI(attribute_data, y, total_records)
-                statistic = 2 * np.log(2) * total_records * mutual_info_score
-                critical = stats.chi2.ppf(self.alpha, ((num_of_classes - 1) *
-                                                       ((len(unique_values_per_attribute[attribute])) - 1)
-                                                       ))
-                if critical < statistic:
-                    attributes_mi[attribute] = mutual_info_score
-                else:
-                    attributes_mi[attribute] = 0
-
-        chosen_attribute = max(attributes_mi, key=attributes_mi.get)
-        if attributes_mi[chosen_attribute] == 0:
-            print('No Nodes at the network. choose smaller alpha')
-            sys.exit()
-        updated_attributes_array.remove(chosen_attribute)
-
-
-        f.write('first layer attribute: \n')
-        for index, mi in attributes_mi.items():
-            f.write(str(index) + ': ' + str(round(mi, 3)) + '\n')
-
-        if chosen_attribute != -1:
-            f.write('\nChosen attribute is: ' + cols[chosen_attribute] + "(" + str(chosen_attribute) + ")" + '\n\n')
-            # f.write('\nSplit points are: ' + str(split_points[chosen_attribute]) + '\n\n')
-        else:
-            f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute) + ")" + '\n\n')
-
-        # will need it for future calculations
-        current_unique_values_per_attribute = unique_values_per_attribute.copy()
-
-        # create new hidden layer of the maximal mutual information attribute and set the layer nodes
-        first_layer = HiddenLayer(chosen_attribute)
-        self.network.root_node.first_layer = first_layer
-        nodes_list = []
-
-        # if chosen att is continuous we convert the partial x values their positions by the splits values
-        if continuous_attributes_type[chosen_attribute]:
-            unique_values_per_attribute[chosen_attribute] = np.arange(len(split_points[chosen_attribute]) + 1)
-
-            split_points[chosen_attribute].sort()
-
-            for record in X:
-                returned_split_index = find_split_position(record[chosen_attribute],
-                                                           split_points[chosen_attribute])
-                record[chosen_attribute] = returned_split_index
-
-        for i in unique_values_per_attribute[chosen_attribute]:
-            x_y_tuple = drop_records(X, chosen_attribute, y, i)
-            # add the relevant records to each node
-            nodes_list.append(AttributeNode(curr_node_index, i, 0, chosen_attribute, x_y_tuple[0], x_y_tuple[1]))
-            curr_node_index += 1
-        first_layer.set_nodes(nodes_list)
-        current_layer = first_layer
-        if continuous_attributes_type[chosen_attribute]:
-            current_layer.is_continuous = split_points[chosen_attribute]
-
-        # initialize map values to empty lists
-        split_points = {key: [] for key in split_points}
-
-        part_continuous_vars_data = {}
-        while len(updated_attributes_array) > 0:
-            # get the attribute that holds the maximal mutual information
-            nodes_info_per_attribute = {}
-            all_nodes_continuous_atts_data = {}
-            attribute_node_mi_data = {}
-            all_continuous_vars_data = {}
-
-            # for each attribute
-            for attribute in updated_attributes_array:
-                part_continuous_vars_data[attribute] = {}
-                if attribute not in nodes_info_per_attribute:
-                    nodes_info_per_attribute[attribute] = []
-
-                # continuous attribute
-                if continuous_attributes_type[attribute]:
-                    if attribute in all_nodes_continuous_atts_data:
-                        all_nodes_att_map = all_nodes_continuous_atts_data[attribute]
-                    else:
-                        all_nodes_att_map = {}
-                    if attribute not in all_continuous_vars_data:
-                        node_continuous_vars_data = {}
-                        all_continuous_vars_data[attribute] = node_continuous_vars_data
-
-                    distinct_attribute_data = current_unique_values_per_attribute[attribute]
-                    iter_att = iter(distinct_attribute_data)
-                    next(iter_att)
-                    part_continuous_vars_data[attribute][0] = {}
-                    part_continuous_vars_data[attribute][1] = {}
-                    for node in current_layer.nodes:
-                        data_class_array = []
-
-                        part_continuous_vars_data[attribute][0][node.index] = []
-
-                        for i in range(node.partial_y.size):
-                            data_class_array.append((node.partial_x[i][attribute], node.partial_y[i]))
-
-                        data_class_array.sort(key=lambda tup: tup[0])
-                        all_continuous_vars_data[attribute][node.index] = data_class_array
-
-                    if is_two_classes:
-                        critical = stats.chi2.ppf(self.alpha, (num_of_classes - 1))
-
-                    for T in iter_att:
-                        # for each node in current layer
-                        for node in current_layer.nodes:
-                            t_attribute_data = []
-                            new_y = []
-                            for data_class_tuple in all_continuous_vars_data[attribute][node.index]:
-                                if data_class_tuple[0] < T:
-                                    t_attribute_data.append(0)
-                                else:
-                                    t_attribute_data.append(1)
-
-                                new_y.append(data_class_tuple[1])
-
-                            if not is_two_classes:
-                                rel_num_of_classes = len(np.unique(np.array(new_y)))
-                                critical = stats.chi2.ppf(self.alpha, (rel_num_of_classes - 1))
-
-                            t_mi = calc_MI(t_attribute_data, new_y, total_records)
-                            statistic = 2 * np.log(2) * total_records * t_mi
-                            if critical < statistic:
-                                if attribute not in attribute_node_mi_data.keys():
-                                    attribute_node_mi_data[attribute] = {}
-
-                                if node.index not in attribute_node_mi_data[attribute].keys():
-                                    attribute_node_mi_data[attribute][node.index] = {}
-
-                                attribute_node_mi_data[attribute][node.index][T] = t_mi
-                                if T in all_nodes_att_map:
-                                    all_nodes_att_map[T] += t_mi
-                                else:
-                                    all_nodes_att_map[T] = t_mi
-
-                            all_nodes_continuous_atts_data[attribute] = all_nodes_att_map
-
-                    if bool(all_nodes_continuous_atts_data[attribute]):
-                        split_point = max(all_nodes_continuous_atts_data[attribute],
-                                          key=all_nodes_continuous_atts_data[attribute].get)
-                        split_points[attribute].append(split_point)
-                        for node in current_layer.nodes:
-                            part_continuous_vars_data[attribute][0][node.index] = []
-                            part_continuous_vars_data[attribute][1][node.index] = []
-
-                            # If the node z is split by the threshold T max, mark the node as split
-                            if node.index in attribute_node_mi_data[attribute].keys():
-                                if split_point in attribute_node_mi_data[attribute][node.index].keys():
-                                    node_info_tuple = (node.index, attribute_node_mi_data[attribute][node.index][split_point])
-                                    nodes_info_per_attribute[attribute].append(node_info_tuple)
-
-                                else:
-                                    new_node_tuple = (node.index, 0)
-                                    nodes_info_per_attribute[attribute].append(new_node_tuple)
-                            else:
-                                new_node_tuple = (node.index, 0)
-                                nodes_info_per_attribute[attribute].append(new_node_tuple)
-
-                            for elem in all_continuous_vars_data[attribute][node.index]:
-                                if elem[0] < split_point:
-                                    part_continuous_vars_data[attribute][0][node.index].append(elem)
-                                else:
-                                    part_continuous_vars_data[attribute][1][node.index].append(elem)
-
-                        recursive_split_points(part_continuous_vars_data[attribute][0], attribute, self,
-                                                 current_layer.nodes, distinct_attribute_data)
-
-                        recursive_split_points(part_continuous_vars_data[attribute][1], attribute, self,
-                                                 current_layer.nodes, distinct_attribute_data)
-                else:
-                    # for each node in current layer
-                    for node in current_layer.nodes:
-                        attribute_data = []
-                        """
-                        Simplify using pandas
-                        """
-                        for record in node.partial_x:
-                            attribute_data.append(record[attribute])
-                        node_mi = calc_MI(attribute_data, node.partial_y, total_records)
-                        statistic = 2 * np.log(2) * total_records * node_mi
-                        critical = stats.chi2.ppf(self.alpha, ((num_of_classes - 1) *
-                                                               ((len(unique_values_per_attribute[attribute])) - 1)
-                                                               ))
-                        if critical < statistic:
-                            node_info_tuple = (node.index, node_mi)
-                        else:
-                            node_info_tuple = (node.index, 0)
-
-                        nodes_info_per_attribute[attribute].append(node_info_tuple)
-
-            max_node_mi = 0
-            chosen_index = -1
-
-            # extract attribute with maximum MI
-            for attribute_index in nodes_info_per_attribute:
-                node_mi = 0
-                for node_info in nodes_info_per_attribute[attribute_index]:
-                        node_mi += node_info[1]
-                if node_mi > max_node_mi:
-                    max_node_mi = node_mi
-                    chosen_index = attribute_index
-
-            chosen_attribute = chosen_index
-
-            f.write('next layer attribute: \n')
-            for index, mi_list in nodes_info_per_attribute.items():
-                curr_mi = sum(mi[1] for mi in mi_list)
-                f.write(str(index) + ': ' + str(round(curr_mi, 3)) + '\n')
-
-            if chosen_attribute != -1:
-                f.write('\nChosen attribute is: ' + cols[chosen_attribute] + "(" + str(chosen_attribute) + ")" + '\n\n')
-                # f.write('\nSplit points are: ' + str(split_points[chosen_attribute]) + '\n\n')
-
-
-            else:
-                f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute) + ")" + '\n\n')
-
-            # stop building the network if all layer's nodes are terminal
-            if chosen_attribute == -1:
+            # there isn't an attribute to split the network by
+            if global_chosen_attribute == -1:
+                if curr_node_index == 1:
+                    print('No Nodes at the network. choose smaller alpha')
+                    sys.exit()
+                _write_details_to_file(layer_position=layer,
+                                       attributes_cmi=attributes_mi,
+                                       chosen_attribute_index=global_chosen_attribute,
+                                       chosen_attribute=cols[global_chosen_attribute])
                 break
 
-            # set terminal nodes
-            for node_tuple in nodes_info_per_attribute[chosen_attribute]:
-                if node_tuple[1] == 0:  # means chi2 test didnt pass
-                    node = current_layer.get_node(node_tuple[0])
-                    if node is not None:
-                        node.set_terminal()
-                        # add weight to terminal node
-                        node.set_weight_probability_pair(calc_weight(node.partial_y, class_count, total_records))
-
-            nodes_info_per_attribute = {}  # initialize max nodes mi data
             nodes_list = []
-            for curr_layer_node in current_layer.nodes:
-                if not curr_layer_node.is_terminal:
 
-                    # if chosen att is continuous we convert the partial x values their positions by the splits values
-                    if continuous_attributes_type[chosen_attribute]:
-                        unique_values_per_attribute[chosen_attribute] = np.\
-                            arange(len(split_points[chosen_attribute]) + 1)
+            is_continuous = 'category' not in columns_type[global_chosen_attribute]
+            # if chosen attribute is continuous we convert the partial x values by the splits values
+            if is_continuous:
+                chosen_split_points = self.split_points[global_chosen_attribute]
+                print(str(chosen_split_points))
+                self._convert_numeric_values(chosen_split_points=chosen_split_points,
+                                             chosen_attribute=global_chosen_attribute,
+                                             layer=current_layer,
+                                             partial_X=X)
 
-                        split_points[chosen_attribute].sort()
-
-                        for record in curr_layer_node.partial_x:
-                            returned_split_index = find_split_position(record[chosen_attribute],
-                                                                       split_points[chosen_attribute])
-                            record[chosen_attribute] = returned_split_index
-
-                    for i in unique_values_per_attribute[chosen_attribute]:
-                        x_y_tuple = drop_records(curr_layer_node.partial_x,
-                                                 chosen_attribute, curr_layer_node.partial_y, i)
-                        # create a node only if it has data
-                        if len(x_y_tuple[0]):
-                            nodes_list.append(AttributeNode(curr_node_index, i, curr_layer_node.index,
-                                                            chosen_attribute, x_y_tuple[0], x_y_tuple[1]))
+            # Create new hidden layer of the maximal mutual information attribute and set the layer nodes
+            un_significant_nodes = []
+            if current_layer is not None:
+                node_index = 0
+                for node in current_layer.get_nodes():
+                    # Check if the node is significant by the chosen attribute
+                    # For both cases: continuous feature and categorical feature
+                    if is_continuous:
+                        if node in set(self.nodes_splited_per_attribute[global_chosen_attribute]):
+                            attributes_mi_per_node = 1
+                        else:
+                            attributes_mi_per_node = 0
+                    else:
+                        attributes_mi_per_node = significant_attributes_per_node[global_chosen_attribute][node_index]
+                    node_index += 1
+                    # If global chosen attribute is significant at this node then we split the node by this attribute
+                    if attributes_mi_per_node > 0:
+                        partial_X = node.partial_x
+                        partial_y = node.partial_y
+                        attribute_data_in_node = list(partial_X[:, global_chosen_attribute])
+                        unique_values = np.unique(attribute_data_in_node)
+                        prev_node = node.index
+                        for i in unique_values:
+                            attribute_node = _create_attribute_node(partial_X=partial_X,
+                                                                    partial_y=partial_y,
+                                                                    chosen_attribute_index=global_chosen_attribute,
+                                                                    attribute_value=i,
+                                                                    curr_node_index=curr_node_index,
+                                                                    prev_node_index=prev_node)
+                            nodes_list.append(attribute_node)
                             curr_node_index += 1
+                    # If the node isn't significant we will set it as terminal node later
+                    else:
+                        un_significant_nodes.append(node)
+            # First layer
+            else:
+                prev_node = 0
+                for i in self.unique_values_per_attribute[global_chosen_attribute]:
+                    attribute_node = _create_attribute_node(partial_X=X,
+                                                            partial_y=y,
+                                                            chosen_attribute_index=global_chosen_attribute,
+                                                            attribute_value=i,
+                                                            curr_node_index=curr_node_index,
+                                                            prev_node_index=prev_node)
+                    nodes_list.append(attribute_node)
+                    curr_node_index += 1
 
-            updated_attributes_array.remove(chosen_attribute)
+            next_layer = HiddenLayer(global_chosen_attribute)
 
-            # update unique values for each attribute:
-            current_unique_values_per_att = {}
-            for node in current_layer.nodes:
-                if not node.is_terminal:
-                    for att in updated_attributes_array:
-                        if continuous_attributes_type[att]:
-                            data_array = []
-                            for node_data in all_continuous_vars_data[att].values():
-                                for data_tuple in node_data:
-                                    data_array.append(data_tuple[0])
+            # If we're in the first layer
+            if current_layer is None:
+                self.network.root_node.first_layer = next_layer
+            else:
+                current_layer.next_layer = next_layer
 
-                            current_unique_values_per_att[att] = np.unique(np.array(data_array))
+            next_layer.set_nodes(nodes_list)
 
-            current_unique_values_per_attribute = current_unique_values_per_att
-            new_layer = HiddenLayer(chosen_attribute)
-            current_layer.next_layer = new_layer
-            current_layer = new_layer
-            current_layer.set_nodes(nodes_list)
-            if continuous_attributes_type[chosen_attribute]:
-                current_layer.is_continuous = split_points[chosen_attribute]
+            if is_continuous:
+                next_layer.is_continuous = True
+                next_layer.split_points = chosen_split_points
 
-            # initialize map values to empty lists
-            split_points = {key: [] for key in split_points}
+            # Set the un significant node as terminal nodes
+            un_significant_nodes_set = list(set(un_significant_nodes))
+            self._set_terminal_nodes(un_significant_nodes_set, class_count)
 
-        # that means we used all of the attributes so we have to set the last layer's nodes to be terminal
-        # or all nodes in current layer are terminal
-        if len(updated_attributes_array) == 0 or chosen_attribute == -1:
-            for node in current_layer.nodes:
-                node.set_terminal()
-                # add weight to terminal node
-                node.set_weight_probability_pair(calc_weight(node.partial_y, class_count, total_records))
+            current_layer = next_layer
+            number_of_layers += 1
 
-        f.write('Total nodes created:' + str(curr_node_index) + "\n")
-        end = time.time()
-        f.write("Running time: " + str(round(end - start, 3)) + " Sec")
-        f.close()
+            _write_details_to_file(layer_position=layer,
+                                   attributes_cmi=attributes_mi,
+                                   chosen_attribute_index=global_chosen_attribute,
+                                   chosen_attribute=cols[global_chosen_attribute])
+            layer = 'next'
 
-        # `fit` should always return `self`
+            attributes_indexes.remove(global_chosen_attribute)
+            self.split_points.clear()
+            self.nodes_splited_per_attribute.clear()
+            significant_attributes_per_node.clear()
+
+        # Network building is done
+        # Set the remaining nodes as terminals
+        self._set_terminal_nodes(nodes=current_layer.get_nodes(),
+                                 class_count=class_count)
+
+        with open('output.txt', 'a') as f:
+            f.write('Total nodes created:' + str(curr_node_index) + "\n")
+            end = time.time()
+            f.write("Running time: " + str(round(end - start, 3)) + " Sec")
+            f.close()
+
         self.is_fitted_ = True
         print("Done. Network is fitted")
+
         return self
 
     def predict(self, X):
-        """ A reference implementation   of a predicting function.
+        """ A reference implementation of a predicting function.
 
         Parameters
         ----------
@@ -578,10 +512,11 @@ class IfnClassifier():
             found_terminal_node = False
             while curr_layer is not None and not found_terminal_node:
                 record_value = record[curr_layer.index]
-                if curr_layer.is_continuous is not False:
-                    record_value = find_split_position(record_value, curr_layer.is_continuous)
+                if curr_layer.is_continuous:
+                    record_value = _find_split_position(value=record_value,
+                                                        positions=curr_layer.split_points)
                 for node in curr_layer.nodes:
-                    if node.inner_index == record_value and node.prev_node == prev_node_index:
+                    if node.attribute_value == record_value and node.prev_node == prev_node_index:
                         chosen_node = node
                         if chosen_node.is_terminal:
                             max_weight = -math.inf
@@ -607,7 +542,7 @@ class IfnClassifier():
         return np.array(predicted)
 
     def predict_proba(self, X):
-        """ A reference implementation of a predicting function.
+        """ A reference implementation of a predicting probabilities function.
 
         Parameters
         ----------
@@ -629,9 +564,10 @@ class IfnClassifier():
             while curr_layer is not None and not found_terminal_node:
                 record_value = record[curr_layer.index]
                 if curr_layer.is_continuous is not False:
-                    record_value = find_split_position(record_value, curr_layer.is_continuous)
+                    record_value = _find_split_position(value=record_value,
+                                                        positions=curr_layer.split_points)
                 for node in curr_layer.nodes:
-                    if node.inner_index == record_value and node.prev_node == prev_node_index:
+                    if node.attribute_value == record_value and node.prev_node == prev_node_index:
                         chosen_node = node
                         if chosen_node.is_terminal:
                             found_terminal_node = True
@@ -653,178 +589,537 @@ class IfnClassifier():
 
         return np.array(predicted)
 
-    def add_training_set_error_rate(self, x, y):
-        correct = 0
-        for i in range(len(y)):
-            # predicted_value = self.predict([x[i]])[0]
-            predicted_value = self.predict(x.iloc[[i]])[0]
-            if predicted_value == y[i]:
-                correct += 1
+    def _choose_split_attribute(self, attributes_indexes, columns_type, nodes=None, X=None, y=None):
+        """ Returns the most significant attribute upon all.
+            The mose significant attribute is the one hold the higher conditional mutual information.
 
-        error_rate = (len(y) - correct) / len(y)
-        with open('output.txt', 'a') as f:
-            f.write("\nError rate is: " + str(round(error_rate, 3)))
-            f.close()
+        Parameters
+        ----------
+        attributes_indexes: list
+            Indexes of the remaining attributes the network hasn't being splitted by.
+
+        columns_type: list
+            Contains the type of each attribute.
+
+        nodes: list, optional
+            list of AttributeNode object in the current layer.
+            None if the number of layer in the network is one.
 
 
+        x: {array-like, sparse matrix}, shape (n_samples, n_feature), optional
+            Contains the data of one feature overall samples in the train set.
+            None if there is more than one layer in the network.
 
-def first_loop_recursive_split_points(sub_interval, attribute, self):
-    """
-    function for continuous feature only
-    :param sub_interval: data frame of <value,class>
-    :param attribute: column index of a feature
-    :param self:
-    :return:
-    """
-    sub_interval_values = [i[0] for i in sub_interval]
-    distinct_attribute_data = np.unique(sub_interval_values)
+        y: (An array_like object of length n_samples)
+            Contains the true class labels for all the samples in X.
+            None if there is more than one layer in the network.
 
-    sub_data_map = {}
+        Returns
+        -------
+            The chosen attribute index
+            Dictionary mapping for each attribute the calculated conditional mutual information over all nodes/X
+            Dictionary mapping for each node and attribute the calculated conditional mutual information.
 
-    iter_att = iter(distinct_attribute_data)
-    next(iter_att)
-
-    if is_two_classes:
-        critical = stats.chi2.ppf(self.alpha, (num_of_classes - 1))
-
-    for T in iter_att:
-        t_attribute_data = []
-        new_y = []
-        for data_class_tuple in sub_interval:
-            if data_class_tuple[0] < T:
-                t_attribute_data.append(0)
+        """
+        attributes_mi = {}
+        # for each node save the mutual information of each attribute index
+        node_mi_per_attribute = {}
+        # get the attribute that holds the maximal mutual information
+        for attribute_index in attributes_indexes:
+            node_mi_per_attribute[attribute_index] = []
+            is_continuous = 'category' not in columns_type[attribute_index]
+            #first layer
+            if nodes is None:
+                if is_continuous:
+                    self._choose_split_numeric_attribute(attribute_index=attribute_index,
+                                                         attributes_mi=attributes_mi)
+                else:
+                    self._choose_split_categorical_attribute(X=X,
+                                                             y=y,
+                                                             attribute_index=attribute_index,
+                                                             attributes_mi=attributes_mi)
             else:
-                t_attribute_data.append(1)
+                if is_continuous:
+                    splited_nodes = self._choose_split_numeric_attribute(attribute_index=attribute_index,
+                                                                         attributes_mi=attributes_mi,
+                                                                         nodes=nodes)
+                    self.nodes_splited_per_attribute[attribute_index] = splited_nodes
+                else:
+                    for node in nodes:
+                        node_mi = self._choose_split_categorical_attribute(X=node.partial_x,
+                                                                           y=node.partial_y,
+                                                                           attribute_index=attribute_index,
+                                                                           attributes_mi=attributes_mi)
+                        node_mi_per_attribute[attribute_index].append(node_mi)
 
-            new_y.append(data_class_tuple[1])
+        chosen_attribute_index = max(attributes_mi, key=attributes_mi.get)
 
-        if not is_two_classes:
-            rel_num_of_classes = len(np.unique(np.array(new_y)))
-            critical = stats.chi2.ppf(self.alpha, (rel_num_of_classes - 1))
-        t_mi = calc_MI(t_attribute_data, new_y, total_records)
-        statistic = 2 * np.log(2) * total_records * t_mi
+        if attributes_mi[chosen_attribute_index] <= 0:
+            chosen_attribute_index = -1
 
-        # t in attribute is a possible split point
+        return chosen_attribute_index, attributes_mi, node_mi_per_attribute
+
+    def _choose_split_categorical_attribute(self, X, y, attribute_index, attributes_mi):
+        """ Calculate the mutual information of the given categorical attribute in the train set.
+
+        Parameters
+        ---------
+        x: {array-like, sparse matrix}, shape (n_samples, n_feature)
+            Contains the data of one feature overall samples in the train set.
+
+        y: (An array_like object of length n_samples)
+            Contains the true class labels for all the samples in X.
+
+        attribute_index: int
+            The index of the attribute being checked.
+
+        attributes_mi: (dictionary) {attribute_index : conditional mutual information}
+            Contains the conditional mutual information of each attribute.
+
+        Returns
+        -------
+            The conditional mutual information of attribute being check in respect to X and y
+        """
+
+        node_mi = 0
+        attribute_data = list(X[:, attribute_index])
+        self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
+
+        mutual_info_score = self._calculate_conditional_mutual_information(attribute_data, y)
+        statistic = 2 * np.log(2) * self.total_records * mutual_info_score
+        critical = stats.chi2.ppf(self.alpha, ((self.num_of_classes - 1) *
+                                               ((len(self.unique_values_per_attribute[attribute_index])) - 1)))
+
         if critical < statistic:
-            # for each point save it's mutual information
-            sub_data_map[T] = t_mi
-
-    if bool(sub_data_map): # if not empty
-        split_point = max(sub_data_map, key=sub_data_map.get)
-        if split_point not in split_points[attribute]:
-            split_points[attribute].append(split_point)
-        if attribute not in nodes_info_per_attribute:
-            nodes_info_per_attribute[attribute] = []
-
-        for node_tuple in nodes_info_per_attribute[attribute]:
-            if node_tuple[0] == 0:
-                new_node_tuple = (0, node_tuple[1] + sub_data_map[split_point])
-                nodes_info_per_attribute[attribute].append(new_node_tuple)
-                nodes_info_per_attribute[attribute].remove(node_tuple)
-                break
-
-        sub_interval_0 = []
-        sub_interval_1 = []
-        for elem in sub_interval:
-            if elem[0] < split_point:
-                sub_interval_0.append(elem)
+            # sum mutual information overall nodes
+            if attribute_index in attributes_mi.keys():
+                attributes_mi[attribute_index] += mutual_info_score
             else:
-                sub_interval_1.append(elem)
+                attributes_mi[attribute_index] = mutual_info_score
+            node_mi = mutual_info_score
+        else:
+            if attribute_index not in attributes_mi.keys():
+                attributes_mi[attribute_index] = 0
 
-        if len(sub_interval_0) > 0:
-            first_loop_recursive_split_points(sub_interval_0, attribute, self)
-        if len(sub_interval_1) > 0:
-            first_loop_recursive_split_points(sub_interval_1, attribute, self)
+        return node_mi
+
+    def _choose_split_numeric_attribute(self, attribute_index, attributes_mi, nodes=None):
+        """ Calculate the mutual information of the given numeric attribute in the train set.
+
+        Parameters
+        ----------
+        attribute_index: int
+            The index of the attribute being checked.
+
+        attributes_mi: (dictionary) {attribute_index : conditional mutual information}
+            Contains the conditional mutual information of each attribute.
+
+        nodes: list, optional
+            list of nodes in the current layer of the network
 
 
+        Returns
+        -------
+            A list of split points of type float which founded significant in the current attribute.
+            In case the attribute founded un-significant the list will be empty.
+        """
 
-def recursive_split_points(sub_interval, attribute, self, nodes,distinct_attribute_data):
-    sub_interval_0 = {}
-    sub_interval_1 = {}
+        self.split_points[attribute_index] = []
+        splited_nodes = []
+        new_total_mi = 0
+        # first layer
+        if nodes is None:
+            new_total_mi = self._discretization(attribute_index=attribute_index,
+                                                total_mi=0,
+                                                interval=self.intervals_per_attribute[attribute_index])
+        else:
+            self._discretization(attribute_index=attribute_index,
+                                 total_mi=0,
+                                 interval=self.intervals_per_attribute[attribute_index],
+                                 nodes=nodes)
 
-    sub_data_map = {}
-    node_T_significants = {}
-    for node in nodes:
-        node_T_significants[node.index] = {}
+            if bool(self.splited_nodes_by_split_points):
+                total_mi = [el[2] for el in self.splited_nodes_by_split_points]
+                max_mi = max(total_mi)
+                max_mi_index = total_mi.index(max_mi)
+                self.split_points[attribute_index] = list(self.splited_nodes_by_split_points[max_mi_index][0])
+                new_total_mi = max_mi
+                splited_nodes = list(self.splited_nodes_by_split_points[max_mi_index][1])
+                self.splited_nodes_by_split_points.clear()
 
-    iter_att = iter(distinct_attribute_data)
-    next(iter_att)
+        if bool(self.split_points[attribute_index]):  # there are split points
+            attributes_mi[attribute_index] = new_total_mi
+        else:
+            attributes_mi[attribute_index] = 0
 
-    if is_two_classes:
-        critical = stats.chi2.ppf(self.alpha, (num_of_classes - 1))
+        return splited_nodes
 
-    for T in iter_att:
+    def _discretization(self, attribute_index, interval, total_mi=0, nodes=None, prev_split_points=None):
+        """ A recursive implementation of a discretization of the IFN algorithm according to the algorithm
+            published in -- TODO: *** ADD A LINK***
+
+
+        Parameters
+        ----------
+        attribute_index: int
+            Index of the attribute being checked
+
+        interval: {array-like, sparse matrix}, shape (n_samples, n_classes)
+            Contains the data of one feature overall samples in the train set.
+
+        total_mi: int (default 0)
+            The total conditional mutual information of the attribute being checked
+            This variables is increasing at each recursive loop.
+
+        nodes: list, optional
+            list of nodes in the current layer of the network
+
+        prev_split_points: frozenset, optional
+            Set of the previous split points founded in the recursion
+
+        Returns
+        -------
+            The new total mutual information of the attribute being checked
+
+        """
+        interval_values = [i[0] for i in interval]
+        distinct_attribute_data = np.unique(interval_values)
+
+        min_value = min(distinct_attribute_data)
+        max_value = max(distinct_attribute_data)
+
+        # mapping the mutual information to every possible split point
+        split_point_mi_map = {}
+        # mapping for each node the mutual information of every possible split point
+        node_mi_per_threshold = {}
+        # list to save the nodes which can be splited by the founded split point
+        splited_nodes = []
+        # save the olf total mutual information in case no split point will be founded
+        new_total_mi = total_mi
+
+        iterator = iter(distinct_attribute_data)
+        next(iterator)
+
+        if prev_split_points is not None:
+            curr_previous_split_points = list(prev_split_points)
+        else:
+            curr_previous_split_points = prev_split_points
+
+        for T in iterator:
+            if T in self.split_points[attribute_index]: continue
+            if nodes is None:
+                t_attribute_date, new_y = _split_data_to_two_intervals(interval=interval,
+                                                                        T=T,
+                                                                        min_value=min_value,
+                                                                        max_value=max_value)
+
+                if len(np.unique(t_attribute_date)) != 2:
+                    break
+
+                statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
+                                                                                                y=new_y)
+
+                # T in attribute is a possible split point
+                if critical < statistic:
+                    # For each point save it's mutual information
+                    split_point_mi_map[T] = t_mi
+            else:
+                for node in nodes:
+                    partial_X = node.partial_x
+                    partial_y = node.partial_y
+                    attribute_data = list(partial_X[:, attribute_index])
+                    data_class_array = list(zip(attribute_data, partial_y))
+
+                    t_attribute_date, new_y = _split_data_to_two_intervals(interval=data_class_array,
+                                                                           T=T,
+                                                                           min_value=min_value,
+                                                                           max_value=max_value)
+
+                    if len(np.unique(t_attribute_date)) != 2:
+                        break
+
+                    statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
+                                                                                                    y=new_y)
+
+                    # T in attribute is a possible split point
+                    if critical < statistic:
+                        # for each point save it's mutual information
+                        if node.index not in node_mi_per_threshold.keys():
+                            node_mi_per_threshold[node.index] = {}
+                        node_mi_per_threshold[node.index][T] = t_mi
+                        if T not in split_point_mi_map.keys():
+                            split_point_mi_map[T] = t_mi
+                        else:
+                            split_point_mi_map[T] += t_mi
+                    else:
+                        if node.index not in node_mi_per_threshold.keys():
+                            node_mi_per_threshold[node.index] = {}
+                        node_mi_per_threshold[node.index][T] = 0
+
+        if bool(split_point_mi_map):  # if not empty
+            # Find the split point which maximize the mutual information
+            split_point = max(split_point_mi_map, key=split_point_mi_map.get)
+            if split_point not in self.split_points[attribute_index]:
+                self.split_points[attribute_index].append(split_point)
+            if nodes is not None:
+                if curr_previous_split_points is not None:
+                    curr_previous_split_points.append(split_point)
+                else:
+                    curr_previous_split_points = [split_point]
+
+            # Find the split point index in the interval using binary search
+            l = [e[0] for e in interval]
+            split_point_index = _binary_search(l, 0, len(l), split_point)
+            # Split the interval into two intervals
+            # smaller - includes all the elements where their value is smaller than split point
+            interval_smaller = interval[0 : split_point_index]
+            # larger - includes all the elements where their value is equal or higher than split point
+            interval_larger = interval[split_point_index : ]
+
+            # Found the nodes which are significant to the founded split point
+            if nodes is not None:
+                for node in nodes:
+                    if node.index in node_mi_per_threshold.keys() \
+                            and split_point in node_mi_per_threshold[node.index].keys() \
+                            and node_mi_per_threshold[node.index][split_point] > 0:
+                        splited_nodes.append(node)
+            else:
+                splited_nodes = None
+
+            new_total_mi += split_point_mi_map[split_point]
+
+            if curr_previous_split_points is not None:
+                split_point_set = frozenset(curr_previous_split_points)
+                self.splited_nodes_by_split_points.append([split_point_set, splited_nodes, new_total_mi])
+                curr_previous_split_points = frozenset(curr_previous_split_points)
+
+            if bool(interval_smaller):
+                self._discretization(attribute_index=attribute_index,
+                                     total_mi=new_total_mi,
+                                     interval=interval_smaller,
+                                     nodes=splited_nodes,
+                                     prev_split_points=curr_previous_split_points)
+            if bool(interval_larger):
+                self._discretization(attribute_index=attribute_index,
+                                     total_mi=new_total_mi,
+                                     interval=interval_larger,
+                                     nodes=splited_nodes,
+                                     prev_split_points=curr_previous_split_points)
+        return new_total_mi
+
+    def _calculate_statistic_and_critical_for_interval(self, X, y):
+        """ calculate the statistic and critical for the data in interval X
+
+        Parameters
+        ---------
+        x: {array-like, sparse matrix}, shape (n_samples, 1_feature)
+            Contains the data of one feature overall samples in the train set.
+
+        y: (An array_like object of length n_samples)
+            Contains the true class labels for all the samples in X.
+
+        Returns
+        -------
+            A float representing the statistic of the given interval X.
+            A float representing the critical of the given interval y
+
+        """
+
+        if self.num_of_classes == 2:
+            critical = stats.chi2.ppf(self.alpha, (self.num_of_classes - 1))
+        else:
+            rel_num_of_classes = len(np.unique(np.array(y)))
+            critical = stats.chi2.ppf(self.alpha, (rel_num_of_classes - 1))
+
+        t_mi = self._calculate_conditional_mutual_information(x=X, y=y)
+        statistic = 2 * np.log(2) * self.total_records * t_mi
+
+        return statistic, critical, t_mi
+
+    def _calculate_conditional_mutual_information(self, x, y):
+        """ Calculate the conditional mutual information of the feature given in x.
+
+        Parameters
+        ----------
+        x: {array-like, sparse matrix}, shape (n_samples, 1_feature)
+            Contains the data of one feature overall samples in the train set.
+
+        y: (An array_like object of length n_samples)
+            Contains the true class labels for all the samples in X.
+
+        total_records: int
+            Number of total records in the train set.
+
+        Returns
+        -------
+            The total conditional mutual information of the feature.
+
+        """
+        partial_records = len(y)
+        # count the number of classes (0 and 1)
+        unique, counts = np.unique(np.array(y), return_counts=True)
+        # <class, number_of_appearances>
+        class_count = dict(zip(unique, counts))
+        # count the number of distinct values in x
+        unique, counts = np.unique(np.array(x), return_counts=True)
+        # <value, number_of_appearances>
+        data_count = dict(zip(unique, counts))
+
+        data_dic = collections.defaultdict(int)
+
+        # Count the number of appearances for each tuple x[i],y[i]
+        for i in range(len(y)):
+            data_dic[x[i], y[i]] = data_dic[x[i], y[i]] + 1
+
+        total_cmi = 0
+
+        # key = [feature_value,class], value = number of appearances of feature value and class together in x
+        for key, value in data_dic.items():
+            # Get the total number of class appearances
+            curr_class_count = class_count[key[1]]
+            # Get the total number of feature value appearances
+            curr_data_count = data_count[key[0]]
+
+            joint = value / self.total_records
+            cond = value / partial_records
+            cond_x = curr_data_count / partial_records
+            cond_y = curr_class_count / partial_records
+
+            mutual_information = joint * math.log(cond / (cond_x * cond_y), 2)
+            total_cmi += mutual_information
+
+        return total_cmi
+
+    def _calculate_weights(self, y, class_count):
+        """ Calculate the weights for each node in the last layer and the terminal nodes.
+
+        Parameters
+        ----------
+        y: (An array_like object of length n_samples)
+            Contains the true class labels for all the samples in X.
+
+        class_count: (list of length n contain tuples)
+            Contain list of tuples - (class value, number of appearances in the train set).
+
+
+        Returns
+        -------
+            The weights for each class.
+
+        """
+        weights_per_class = {}
+        for class_info in class_count:
+            cut_len = len(np.extract(y == [class_info[0]], y))
+            if cut_len != 0:
+                weight = (cut_len / self.total_records) \
+                         * (math.log((cut_len / len(y)) / (class_info[1] / self.total_records), 2))
+                weights_per_class[class_info[0]] = (weight, (cut_len / len(y)))
+            else:
+                weights_per_class[class_info[0]] = (0, 0)
+        return weights_per_class
+
+    def _define_interval_for_numeric_feature(self, X, y, attributes_indexes, columns_type):
+        """ Define intervals for each numeric feature in the train set.
+
+        Parameters
+        ---------
+        x: {array-like, sparse matrix}, shape (n_samples, n_features)
+            The samples in the train set.
+
+        y: (An array_like object of length n_samples)
+            Contains the true class labels for all the samples in X.
+
+        attributes_indexes: (An array_like object of length n_features)
+            Contains of the attributes indexes in the train set.
+
+        columns_type: (An array_like object of length n_features)
+            Contains the type of each attribute in the train set.
+            Each position in the array contain the type of the corresponding attribute in attributes_index array.
+
+
+        Returns
+        --------
+            A dictionary contains for each numeric attribute it's data interval.
+
+
+        """
+        intervals_per_attributes = {}
+
+        for attribute_index in attributes_indexes:
+            is_continuous = 'category' not in columns_type[attribute_index]
+            if is_continuous:
+                attribute_data = list(X[:, attribute_index])
+                self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
+                data_class_array = list(zip(attribute_data, y))
+                data_class_array.sort(key=lambda tup: tup[0])
+                intervals_per_attributes[attribute_index] = data_class_array
+
+        return intervals_per_attributes
+
+    def _convert_numeric_values(self, chosen_split_points, chosen_attribute, layer, partial_X):
+        """ After finding the chosen split points for the given attribute, this function does the actual discretization.
+            For each data value in the chosen attribute, this function covert it to number between 0 and
+            len(chosen_split_points) by using the _find_split_position function.
+
+        Parameters
+        ----------
+        partial_X: {array-like, sparse matrix}, shape (n_samples, n_features)
+            Contains a partial samples from the train set.
+
+        chosen_split_points: (An array_like object of length n)
+            Contains all the chosen split points founded significant for the chosen_attribute.
+
+        chosen_attribute: int
+            The index of the attribute upon the network will be splited by.
+
+        layer: HiddenLayer
+            The current HiddenLayer in the network.
+
+
+        """
+        # For the case it's the first layer
+        if not bool(chosen_split_points):
+            chosen_split_points = self.split_points[chosen_attribute]
+
+        self.unique_values_per_attribute[chosen_attribute] = np.arange(len(chosen_split_points) + 1)
+        chosen_split_points.sort()
+
+        if layer is not None:
+            # Get the nodes which should be splited by the chosen attribute
+            splited_nodes = set(self.nodes_splited_per_attribute[chosen_attribute])
+            for node in layer.get_nodes():
+                if node in splited_nodes:
+                    partial_x = node.partial_x
+                    # convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
+                    for record in partial_x:
+                        record[chosen_attribute] = _find_split_position(value=record[chosen_attribute],
+                                                                        positions=chosen_split_points)
+        # First layer
+        else:
+            # Convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
+            for record in partial_X:
+                record[chosen_attribute] = _find_split_position(value=record[chosen_attribute],
+                                                                positions=chosen_split_points)
+
+    def _set_terminal_nodes(self, nodes, class_count):
+        """ Connecting the given nodes to the terminal nodes in the network.
+
+        Parameters
+        ----------
+        nodes: (An array_like object of length n)
+            Contains a list of objects from the AttributeNode type.
+
+        class_count: (list of length n contain tuples)
+            Contain list of tuples - (class value, number of appearances in the train set).
+
+
+        """
+
         for node in nodes:
-            t_attribute_data = []
-            new_y = []
-
-            for data_class_tuple in sub_interval[node.index]:
-                if data_class_tuple[0] < T:
-                    t_attribute_data.append(0)
-                else:
-                    t_attribute_data.append(1)
-
-                new_y.append(data_class_tuple[1])
-
-            if not is_two_classes:
-                rel_num_of_classes = len(np.unique(np.array(new_y)))
-                critical = stats.chi2.ppf(self.alpha, (rel_num_of_classes - 1))
-
-            t_mi = calc_MI(t_attribute_data, new_y, total_records)
-            statistic = 2 * np.log(2) * total_records * t_mi
-
-            if critical < statistic:
-                if T in sub_data_map.keys():
-                    sub_data_map[T] += t_mi
-                else:
-                    sub_data_map[T] = t_mi
-
-                node_T_significants[node.index][T] = t_mi
-
-    if bool(sub_data_map):
-        split_point = max(sub_data_map, key=sub_data_map.get)
-        if split_point not in split_points[attribute]:
-            split_points[attribute].append(split_point)
-        if attribute not in nodes_info_per_attribute:
-            nodes_info_per_attribute[attribute] = []
-
-        new_tuple_list = []
-        for node_tuple in nodes_info_per_attribute[attribute]:
-            if split_point in node_T_significants[node_tuple[0]].keys():
-                new_node_tuple = (node_tuple[0], node_tuple[1] + node_T_significants[node_tuple[0]][split_point])
-                new_tuple_list.append(new_node_tuple)
-            else:
-                new_tuple_list.append(node_tuple)
-
-        nodes_info_per_attribute[attribute] = new_tuple_list
-
-        sub_interval_0 = {}
-        sub_interval_1 = {}
-
-        for node_i, values in sub_interval.items():
-            sub_interval_0[node_i] = []
-            sub_interval_1[node_i] = []
-            for elem in values:
-                if elem[0] < split_point:
-                    sub_interval_0[node_i].append(elem)
-                else:
-                    sub_interval_1[node_i].append(elem)
-
-    if len(sub_interval_0) > 0:
-        recursive_split_points(sub_interval_0, attribute, self, nodes, distinct_attribute_data)
-    if len(sub_interval_1) > 0:
-        recursive_split_points(sub_interval_1, attribute, self, nodes, distinct_attribute_data)
+            node.set_terminal()
+            # add weight between node and the terminal nodes
+            node.set_weight_probability_pair(self._calculate_weights(y=node.partial_y,
+                                                                     class_count=class_count))
 
 
-def find_split_position(record, positions):
-    if record < positions[0]:
-        return 0
 
-    if record >= positions[len(positions)-1]:
-        return len(positions)
-
-    for i in range(len(positions)):
-        first_position = positions[i]
-        second_position = positions[i+1]
-        if first_position <= record < second_position:
-            return i+1
