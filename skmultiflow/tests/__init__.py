@@ -5,8 +5,8 @@ from skmultiflow import IfnClassifier
 from skmultiflow._dataProcessing import DataProcessor
 
 
-def test_with_dataProcessing(file_path, test_size):
-    clf = IfnClassifier(0.9)
+def test_ifnClassifier(file_path, test_size):
+    clf = IfnClassifier(0.99)
     dp = DataProcessor()
     X_train, X_test, y_train, y_test = dp.convert(file_path, test_size)
 
@@ -19,4 +19,4 @@ def test_with_dataProcessing(file_path, test_size):
     # print(clf.predict_proba(X_test))
 
 
-test_with_dataProcessing("datasets/Credit.csv", 0.3)
+test_ifnClassifier("datasets/Chess.csv", 0.3)

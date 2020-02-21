@@ -796,6 +796,8 @@ class IfnClassifier():
         splited_nodes = []
         # save the olf total mutual information in case no split point will be founded
         new_total_mi = total_mi
+        # Counter for the number of nodes we don't need to check anymore
+        how_many_nodes_exceeded = 0
 
         iterator = iter(distinct_attribute_data)
         next(iterator)
@@ -824,6 +826,7 @@ class IfnClassifier():
                     # For each point save it's mutual information
                     split_point_mi_map[T] = t_mi
             else:
+                how_many_nodes_exceeded = 0
                 for node in nodes:
                     partial_X = node.partial_x
                     partial_y = node.partial_y
@@ -836,7 +839,8 @@ class IfnClassifier():
                                                                            max_value=max_value)
 
                     if len(np.unique(t_attribute_date)) != 2:
-                        break
+                        how_many_nodes_exceeded += 1
+                        continue
 
                     statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
                                                                                                     y=new_y)
@@ -855,6 +859,9 @@ class IfnClassifier():
                         if node.index not in node_mi_per_threshold.keys():
                             node_mi_per_threshold[node.index] = {}
                         node_mi_per_threshold[node.index][T] = 0
+
+            if nodes is not None and how_many_nodes_exceeded == len(nodes):
+                break
 
         if bool(split_point_mi_map):  # if not empty
             # Find the split point which maximize the mutual information
