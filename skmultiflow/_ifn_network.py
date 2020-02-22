@@ -73,7 +73,7 @@ class HiddenLayer:
 class IfnNetwork:
     def __init__(self):
         self.target_layer = []
-        self.root_node = RootNode
+        self.root_node = RootNode()
 
     def build_target_layer(self, num_of_classes):
         if len(num_of_classes) != 0:
