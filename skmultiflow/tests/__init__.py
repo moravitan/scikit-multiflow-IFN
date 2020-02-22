@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pickle
 from sklearn.metrics import accuracy_score
 from skmultiflow import IfnClassifier
 from skmultiflow._dataProcessing import DataProcessor
@@ -11,8 +12,10 @@ def test_ifnClassifier(file_path, test_size):
     X_train, X_test, y_train, y_test = dp.convert(file_path, test_size)
 
     clf.fit(X_train, y_train)
-    clf.network.create_network_structure_file()
-
+    # pickle.dump(clf, open("clf.pickle", "wb"))
+    # loadedCLF = pickle.load(open("clf.pickle", "rb"))
+    # loadedCLF.network.create_network_structure_file()
+    # y_predN = loadedCLF.predict(X_test)
     y_predN = clf.predict(X_test)
 
     print("accuracy", accuracy_score(y_test, y_predN))
