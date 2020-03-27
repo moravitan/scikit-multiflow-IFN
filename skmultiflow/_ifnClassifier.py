@@ -151,7 +151,7 @@ def _write_details_to_file(layer_position, attributes_cmi, chosen_attribute_inde
 
 
     """
-    with open('output.txt', 'a') as f:
+    with open('tmp/output.txt', 'a') as f:
         f.write(layer_position + ' layer attribute: \n')
         for index, mi in attributes_cmi.items():
             f.write(str(index) + ': ' + str(round(mi, 3)) + '\n')
@@ -347,7 +347,7 @@ class IfnClassifier():
 
         significant_attributes_per_node = {}
 
-        with open("output.txt", "w+") as f:
+        with open("tmp/output.txt", "w+") as f:
             f.write('Output data for dataset: \n\n')
             f.write('Total instances: ' + str(self.total_records) + '\n')
             f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
@@ -479,7 +479,7 @@ class IfnClassifier():
         self._set_terminal_nodes(nodes=current_layer.get_nodes(),
                                  class_count=class_count)
 
-        with open('output.txt', 'a') as f:
+        with open('tmp/output.txt', 'a') as f:
             f.write('Total nodes created:' + str(curr_node_index) + "\n")
             end = time.time()
             f.write("Running time: " + str(round(end - start, 3)) + " Sec")
@@ -533,7 +533,7 @@ class IfnClassifier():
                         break
 
         index = 1
-        with open('predict.txt', 'w') as f:
+        with open('tmp/predict.txt', 'w') as f:
             for row in predicted:
                 f.write(str(index) + '. ' + str(row) + '\n')
                 index += 1
@@ -581,7 +581,7 @@ class IfnClassifier():
                         break
 
         index = 1
-        with open('predict.txt', 'w') as f:
+        with open('tmp/predict.txt', 'w') as f:
             for row in predicted:
                 f.write(str(index) + '. ' + str(row) + '\n')
                 index += 1
