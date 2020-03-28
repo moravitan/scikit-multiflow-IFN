@@ -8,7 +8,7 @@ import filecmp
 import numpy as np
 import shutil
 
-dataset_path = "datasets/Glass.csv"
+dataset_path = "datasets/dataset.csv"
 test_size_percentage = 0.3
 alpha = 0.99
 test_tmp_folder = "tmp"
@@ -32,11 +32,11 @@ def test_classifier_const_dataset():
     clf.network.create_network_structure_file()
     y_pred = clf.predict(x_test)
 
-    actual_pred = np.array([1, 2, 3, 4, 5])  # maybe change to get from file
+    expected_pred = np.array([1, 2, 3, 4, 5])  # maybe change to get from file
 
     assert filecmp.cmp('tmp/network_structure.txt', 'expert_network_structure.txt') is True
-    assert np.array_equal(y_pred, actual_pred)
-    assert accuracy_score(y_test, y_pred) == accuracy_score(y_test, actual_pred)
+    assert np.array_equal(y_pred, expected_pred)
+    assert accuracy_score(y_test, y_pred) == accuracy_score(y_test, expected_pred)
 
     _clean_test_env()
 
