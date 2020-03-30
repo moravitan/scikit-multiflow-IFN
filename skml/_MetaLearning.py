@@ -1,54 +1,58 @@
 import math
-
 import scipy.stats as stats
+import numpy as np
+
 
 
 class MetaLearning:
 
     def __init__(self, alpha, number_of_classes):
         if 0 <= alpha < 1:
-            self.alpha = alpha
+            self._alpha = alpha
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
         if 1 < number_of_classes:
-            self.classes = number_of_classes
+            self._classes = number_of_classes
         else:
             raise ValueError("Enter number of classes bigger than 1")
-
+        self._window = 0
 
     @property
     def classes(self):
-        return self.classes
+        return self._classes
 
     @classes.setter
     def classes(self, value):
-        self.classes = value
+        self._classes = value
 
     @property
     def alpha(self):
-        return self.alpha
+        return self._alpha
 
     @alpha.setter
     def alpha(self, value):
-        self.alpha = value
+        self._alpha = value
 
     @property
     def window(self):
-        return self.window
+        return self._window
 
     @window.setter
     def window(self, value):
-        self.window = value
+        self._window = value
 
-    def _calculate_Wint(self, Pe):
+    def calculate_Wint(self, Pe):
 
         chi2_alpha = stats.chi2.ppf(self.alpha, self.classes - 1)
         entropy_Pe = stats.entropy([Pe, 1 - Pe], base=2)
 
-        denominator = 2 * stats.np.log(2) * \
-                      (math.log(self.classes - entropy_Pe - self.Pe * math.log(self.classes - 1), 2), 2)
+        denominator = 2 * np.log(2) * \
+                      (math.log(self.classes, 2) - entropy_Pe - Pe * math.log(self.classes - 1, 2))
 
-        self.window = int(chi2_alpha / denominator)
+        if denominator == 0:
+            self.window = 0
+        else:
+            self.window = int(chi2_alpha / denominator)
 
         return self.window
 
@@ -58,10 +62,13 @@ class MetaLearning:
         entropy_T = stats.entropy([T, 1 - T], base=2)
         entropy_Etr = stats.entropy([Etr, 1 - Etr], base=2)
 
-        denominator = 2 * stats.np.log(2) * \
-                      (math.log(entropy_T - entropy_Etr - Etr * math.log(self.classes - 1), 2), 2)
+        denominator = 2 * np.log(2) * \
+                      (entropy_T - entropy_Etr - Etr * math.log(self.classes - 1, 2))
 
-        self.window = int(chi2_alpha / denominator)
+        if denominator == 0:
+            self.window = 0
+        else:
+            self.window = int(chi2_alpha / denominator)
 
         return self.window
 

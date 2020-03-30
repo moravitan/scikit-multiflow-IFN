@@ -75,7 +75,7 @@ class OLIN():
 
     def start(self):
 
-        self.window = self.meta_learning._calculate_Wint(self.Pe)
+        self.window = self.meta_learning.calculate_Wint(self.Pe)
         i = self.n_min - self.window
         j = self.window
         add_count = self.init_add_count
