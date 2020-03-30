@@ -7,7 +7,7 @@ number_of_classes = 2
 Pe = 0.5
 
 
-def test_calculate_initial_window_size_defualt_values():
+def test_calculate_initial_window_size_default_values():
     meta_learning = MetaLearning(alpha, number_of_classes)
     initial_window = meta_learning.calculate_Wint(Pe)
 
@@ -55,7 +55,7 @@ def test_max_diff():
     assert max_diff == expected
 
 
-test_calculate_initial_window_size_defualt_values()
+test_calculate_initial_window_size_default_values()
 test_calculate_initial_window_size()
 test_calculate_window_size()
 test_max_diff()
