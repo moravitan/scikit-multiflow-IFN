@@ -300,6 +300,8 @@ class IfnClassifier():
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
 
+
+
     # def _is_numeric(self, X):
     #     if len(np.unique(X)) == 2:
     #         return False
@@ -1128,5 +1130,12 @@ class IfnClassifier():
             node.set_weight_probability_pair(self._calculate_weights(y=node.partial_y,
                                                                      class_count=class_count))
 
+    def calculate_error_rate(self, X, y):
+        correct = 0
+        for i in range(len(y)):
+            predicted_value = self.predict(X.iloc[[i]])[0]
+            if predicted_value == y[i]:
+                correct += 1
 
-
+        error_rate = (len(y) - correct) / len(y)
+        return error_rate
