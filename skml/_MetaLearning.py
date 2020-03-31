@@ -3,7 +3,6 @@ import scipy.stats as stats
 import numpy as np
 
 
-
 class MetaLearning:
 
     def __init__(self, alpha, number_of_classes):

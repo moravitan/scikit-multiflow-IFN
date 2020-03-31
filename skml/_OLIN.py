@@ -2,11 +2,14 @@ import math
 import pickle
 
 import numpy as np
+import pandas as pd
 from skml import IfnClassifier
 from skml import MetaLearning
 from skmultiflow.data import SEAGenerator
 
-class OLIN():
+
+class OnlineNetwork:
+
 
     def __init__(self,
                  classifier:IfnClassifier,
@@ -22,7 +25,7 @@ class OLIN():
                  red_add_count=75,
                  min_add_count=1,
                  max_window=1000,
-                 data_stream_generator=SEAGenerator()):
+                 data_stream_generator=SEAGenerator(random_state=1)):
 
         """
         Parameters
@@ -61,7 +64,7 @@ class OLIN():
         self.path = path
         self.n_min = n_min
         self.n_max = n_max
-        self.Pe =  Pe
+        self.Pe = Pe
         self.init_add_count = init_add_count
         self.inc_add_count = inc_add_count
         self.max_add_count = max_add_count
@@ -71,10 +74,11 @@ class OLIN():
         self.window = None
         self.meta_learning = MetaLearning(alpha, number_of_classes)
         self.data_stream_generator = data_stream_generator
-
+        self.data_stream_generator.prepare_for_use()
 
     def start(self):
 
+        counter = 1
         self.window = self.meta_learning.calculate_Wint(self.Pe)
         i = self.n_min - self.window
         j = self.window
@@ -90,7 +94,8 @@ class OLIN():
                 y_batch.append(y[0])
                 i = i + 1
 
-            self.classifier.fit(X_batch, y_batch)
+            X_batch_df = pd.DataFrame(X_batch)
+            self.classifier.fit(X_batch_df, y_batch)
             Etr = self.classifier.calculate_error_rate(X_batch, y_batch)
 
             k = j + add_count
@@ -106,12 +111,18 @@ class OLIN():
             max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
 
             if abs(Eval - Etr) < max_diff: # concept is stable
+                print("++++++++++++++++")
+                print("model is stable")
+                print("++++++++++++++++")
                 add_count = min(add_count * (1 + (self.inc_add_count / 100)), self.max_add_count)
                 self.window = min(self.window + add_count, self.max_window)
                 self.meta_learning.window(self.window)
                 i = j - self.window
 
             else: # concept drift detected
+                print("**********************")
+                print("concept drift detected")
+                print("**********************")
                 unique, counts = np.unique(np.array(y_batch), return_counts=True)
                 target_distribution = counts[0] / len(y_batch)
                 NI = len(self.classifier.network.root_node.first_layer.nodes)
@@ -119,4 +130,6 @@ class OLIN():
                 i = j - self.window
                 add_count = max(add_count * (1 - (self.red_add_count / 100)), self.min_add_count)
 
-            pickle.dump(self.classifier, open(self.path, "wb"))
+            path = self.path + "/" + str(counter)
+            pickle.dump(self.classifier, open(path, "wb"))
+            counter = counter + 1

@@ -151,7 +151,7 @@ def _write_details_to_file(layer_position, attributes_cmi, chosen_attribute_inde
 
 
     """
-    with open('tmp/output.txt', 'a') as f:
+    with open('output.txt', 'a') as f:
         f.write(layer_position + ' layer attribute: \n')
         for index, mi in attributes_cmi.items():
             f.write(str(index) + ': ' + str(round(mi, 3)) + '\n')
@@ -323,8 +323,9 @@ class IfnClassifier():
         start = time.time()
         print('Building the network...')
 
-
         cols = list(X.columns.values)
+        cols = [str(i) for i in cols]
+
         columns_type = _get_columns_type(X)
 
         X, y = check_X_y(X, y, accept_sparse=True)
@@ -349,7 +350,7 @@ class IfnClassifier():
 
         significant_attributes_per_node = {}
 
-        with open("tmp/output.txt", "w+") as f:
+        with open("output.txt", "w+") as f:
             f.write('Output data for dataset: \n\n')
             f.write('Total instances: ' + str(self.total_records) + '\n')
             f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
@@ -383,6 +384,8 @@ class IfnClassifier():
                                        attributes_cmi=attributes_mi,
                                        chosen_attribute_index=global_chosen_attribute,
                                        chosen_attribute=cols[global_chosen_attribute])
+
+
                 break
 
             nodes_list = []
@@ -391,7 +394,6 @@ class IfnClassifier():
             # if chosen attribute is continuous we convert the partial x values by the splits values
             if is_continuous:
                 chosen_split_points = self.split_points[global_chosen_attribute]
-                print(str(chosen_split_points))
                 self._convert_numeric_values(chosen_split_points=chosen_split_points,
                                              chosen_attribute=global_chosen_attribute,
                                              layer=current_layer,
@@ -469,6 +471,7 @@ class IfnClassifier():
                                    attributes_cmi=attributes_mi,
                                    chosen_attribute_index=global_chosen_attribute,
                                    chosen_attribute=cols[global_chosen_attribute])
+
             layer = 'next'
 
             attributes_indexes.remove(global_chosen_attribute)
@@ -481,7 +484,7 @@ class IfnClassifier():
         self._set_terminal_nodes(nodes=current_layer.get_nodes(),
                                  class_count=class_count)
 
-        with open('tmp/output.txt', 'a') as f:
+        with open('output.txt', 'a') as f:
             f.write('Total nodes created:' + str(curr_node_index) + "\n")
             end = time.time()
             f.write("Running time: " + str(round(end - start, 3)) + " Sec")
@@ -535,7 +538,7 @@ class IfnClassifier():
                         break
 
         index = 1
-        with open('tmp/predict.txt', 'w') as f:
+        with open('predict.txt', 'w') as f:
             for row in predicted:
                 f.write(str(index) + '. ' + str(row) + '\n')
                 index += 1
@@ -1133,7 +1136,8 @@ class IfnClassifier():
     def calculate_error_rate(self, X, y):
         correct = 0
         for i in range(len(y)):
-            predicted_value = self.predict(X.iloc[[i]])[0]
+            predicted_value = self.predict([X[i]])[0]
+            # predicted_value = self.predict(X.iloc[[i]])[0]
             if predicted_value == y[i]:
                 correct += 1
 
