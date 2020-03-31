@@ -1,6 +1,4 @@
 from skml import MetaLearning
-import scipy.stats as stats
-import numpy as np
 
 alpha = 0.99
 number_of_classes = 2
@@ -24,7 +22,6 @@ def test_calculate_initial_window_size():
     expected = 40
 
     assert initial_window == expected
-
 
 
 def test_calculate_window_size():
