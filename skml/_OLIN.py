@@ -76,7 +76,19 @@ class OnlineNetwork:
         self.data_stream_generator = data_stream_generator
         self.data_stream_generator.prepare_for_use()
 
-    def start(self):
+    def regenerate(self):
+        """ This function is an implementation to the regenerative algorithm as represented
+            by Prof. Mark Last in "https://content.iospress.com/articles/intelligent-data-analysis/ida00083".
+
+            This function obtain an IFN model for every window arriving in the stream,
+            and validate the prediction on the next window, which represent the validation examples.
+            The size of the window depends on the stability of the information, if the data is stable,
+            the size of the window increase, otherwise (a concept drift detect) the size of the window
+            re-calculate.
+
+            After each iteration the IFN model is saved to a file in the path given by the user.
+
+        """
 
         counter = 1
         self.window = self.meta_learning.calculate_Wint(self.Pe)
@@ -110,7 +122,7 @@ class OnlineNetwork:
             Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
             max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
 
-            if abs(Eval - Etr) < max_diff: # concept is stable
+            if abs(Eval - Etr) < max_diff:  # concept is stable
                 print("++++++++++++++++")
                 print("model is stable")
                 print("++++++++++++++++")
@@ -119,7 +131,7 @@ class OnlineNetwork:
                 self.meta_learning.window(self.window)
                 i = j - self.window
 
-            else: # concept drift detected
+            else:  # concept drift detected
                 print("**********************")
                 print("concept drift detected")
                 print("**********************")
