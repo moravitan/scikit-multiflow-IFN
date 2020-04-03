@@ -25,7 +25,7 @@ class OnlineNetwork:
                  red_add_count=75,
                  min_add_count=1,
                  max_window=1000,
-                 data_stream_generator=SEAGenerator(random_state=1)):
+                 data_stream_generator=SEAGenerator()):
 
         """
         Parameters
@@ -115,10 +115,13 @@ class OnlineNetwork:
             y_validation_samples = []
 
             while j < k:
-                X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
+                X_validation, y_validation = self.data_stream_generator.next_sample()
+                X_validation_samples.append(X_validation[0])
+                y_validation_samples.append(y_validation[0])
                 j = j + 1
 
             j = k
+
             Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
             max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
 
@@ -128,7 +131,7 @@ class OnlineNetwork:
                 print("++++++++++++++++")
                 add_count = min(add_count * (1 + (self.inc_add_count / 100)), self.max_add_count)
                 self.window = min(self.window + add_count, self.max_window)
-                self.meta_learning.window(self.window)
+                self.meta_learning.window = self.window
                 i = j - self.window
 
             else:  # concept drift detected
@@ -145,3 +148,5 @@ class OnlineNetwork:
             path = self.path + "/" + str(counter)
             pickle.dump(self.classifier, open(path, "wb"))
             counter = counter + 1
+            X_batch.clear()
+            y_batch.clear()
