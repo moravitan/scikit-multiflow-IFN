@@ -1,6 +1,6 @@
 import math
 import pickle
-
+import os
 import numpy as np
 import pandas as pd
 from skml import IfnClassifier
@@ -8,7 +8,7 @@ from skml import MetaLearning
 from skmultiflow.data import SEAGenerator
 
 
-class OnlineNetwork:
+class PureMultiple:
 
     def __init__(self,
                  classifier: IfnClassifier,
@@ -75,7 +75,7 @@ class OnlineNetwork:
         self.data_stream_generator = data_stream_generator
         self.data_stream_generator.prepare_for_use()
 
-    def regenerate(self):
+    def pure_model_generation(self):
         """ This function is an implementation to the regenerative algorithm as represented
             by Prof. Mark Last in "https://content.iospress.com/articles/intelligent-data-analysis/ida00083".
 
@@ -87,6 +87,21 @@ class OnlineNetwork:
 
             After each iteration the IFN model is saved to a file in the path given by the user.
 
+        """
+
+        """
+        Pure Multiple Model IOLIN
+        Input: Training window T, current network model, past network models
+        Output: Former/New network model
+        For each new training window
+            Search for the best network from the past by:
+            1. Comparing the value of the target entropy (based on the
+            current window data) to entropy values in all windows where a
+            totally new network was built.
+            2. Choose Network with Min |Ecurrent(T)–Eformer(T)|.
+            3. Add new layers if possible.
+            If a concept drift is detected again with the chosen network
+            Create totally new network using the IN algorithm
         """
 
         counter = 1
@@ -104,9 +119,23 @@ class OnlineNetwork:
                 X_batch.append(X[0])
                 y_batch.append(y[0])
                 i = i + 1
-
             X_batch_df = pd.DataFrame(X_batch)
-            self.classifier.fit(X_batch_df, y_batch)
+
+            classifier_files_names = os.listdir("generatedModels")
+            generated_classifiers = {}
+            for classifier in classifier_files_names:
+                generated_clf = pickle.load(open("generatedModels/" + classifier, "rb"))
+                generated_classifiers[classifier] = generated_clf.calculate_error_rate(X_batch_df, y_batch)
+            chosen_classifier_name = min(generated_classifiers, key=generated_classifiers.get)
+            chosen_classifier = pickle.load(open("generatedModels/" + chosen_classifier_name, "rb"))
+
+            if generated_classifiers[chosen_classifier] > self.Pe:  # concept drift detected
+                chosen_classifier = IfnClassifier(self.alpha)
+                chosen_classifier.fit(X_batch_df, y_batch)
+                chosen_classifier_name = "need to todo"
+
+            pickle.dump(chosen_classifier, open("generatedModels/" + chosen_classifier_name, "wb"))
+
             Etr = self.classifier.calculate_error_rate(X_batch, y_batch)
 
             k = j + add_count
