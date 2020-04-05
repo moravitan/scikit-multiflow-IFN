@@ -1,6 +1,6 @@
 import os
 import shutil
-from skml import OnlineNetwork
+from skml import OnlineNetworkRegenerative
 from skml import IfnClassifier
 
 
@@ -20,7 +20,7 @@ def _clean_test_env():
 def test_OLIN():
     _setup_test_env()
     ifn = IfnClassifier(alpha)
-    OLIN = OnlineNetwork(ifn, test_tmp_folder,n_min=164, n_max=300, init_add_count=50, inc_add_count=70, Pe=0.6)
+    OLIN = OnlineNetworkRegenerative(ifn, test_tmp_folder, n_min=164, n_max=300, init_add_count=50, inc_add_count=70, Pe=0.6)
     OLIN.regenerate()
     _clean_test_env()
 

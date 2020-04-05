@@ -11,255 +11,8 @@ import math
 import collections
 import time
 import sys
+import skml.Utils as Utils
 
-
-def _binary_search(array, left, right, value):
-    """
-
-    Parameters
-    ----------
-    array: (An array_like object of length n)
-        A sorted array of int/float.
-
-    left: int
-        Index in the array.
-
-    right: int
-        Index in the array.
-
-    value: int/float
-        The value needed to be founded in the array.
-
-
-    Returns
-    -------
-        The index of the value in the array.
-
-
-    """
-
-    # Check base case
-    if right >= left:
-        mid = int(left + (right - left) / 2)
-        # If element is present at the middle itself
-        if array[mid] == value:
-            return mid
-        # If element is smaller than mid, then it can only
-        # be present in left subarray
-        elif array[mid] > value:
-            return _binary_search(array, left, mid - 1, value)
-        # Else the element can only be present in right subarray
-        else:
-            return _binary_search(array, mid + 1, right, value)
-    else:
-        # Element is not present in the array
-        return -1
-
-
-def _split_data_to_two_intervals(interval, T, min_value, max_value):
-    """ Splitting the given interval to two intervals.
-        One interval contains all the data which is smaller than T (will be referred as left interval).
-        while the second interval contain all the data which is equal or larger than T (will be referred as right
-        interval)
-
-    Parameters
-    ----------
-    interval: {array-like, sparse matrix}, shape (n_samples, n_classes)
-        Contains the data of one feature overall samples in the train set.
-
-    T: int or float
-        Threshold point
-
-    min_value: int or float
-        minimum value in the interval
-
-    max_value: int or float
-        maximum value in the interval
-
-    Returns
-    -------
-        An array_like object of length n_samples contains 0's equal to the number of values which are smaller than
-        T and 1's equal to the number of values which are equal of larger than T.
-        An array_like object of length n_samples which contains the true class labels for all the samples in the
-        interval.
-    """
-    t_attribute_data = []
-    new_y = []
-
-    interval.sort(key=lambda tup: tup[0])
-
-    for data_class_tuple in interval:
-        if min_value <= data_class_tuple[0] <= max_value:
-            new_y.append(data_class_tuple[1])
-            if data_class_tuple[0] < T:
-                t_attribute_data.append(0)
-            else:
-                t_attribute_data.append(1)
-
-    return t_attribute_data, new_y
-
-
-def _find_split_position(value, positions):
-    """ Find the position of the given value between the list of given positions.
-
-    Parameters
-    ----------
-    value: int or float
-        A value of the chosen attribute upon the current layer in the network will be splited by.
-
-    positions: (An array_like object of length n)
-        List of the chosen split points which founded significant for the chosen attribute upon the current
-        layer in the network will be splited by.
-
-
-    Returns
-    -------
-        The position after discretization of the given value among the positions list.
-
-    """
-    # If value is smaller than the first split point
-    if value < positions[0]:
-        return 0
-    # If value is equal/larger than the first split point
-    if positions[len(positions) - 1] <= value:
-        return len(positions)
-
-    for i in range(len(positions)):
-        first_position = positions[i]
-        second_position = positions[i + 1]
-        if first_position <= value < second_position:
-            return i + 1
-
-
-def _write_details_to_file(layer_position, attributes_cmi, chosen_attribute_index, chosen_attribute):
-    """ Write network details to a file name 'output.txt'.
-
-    Parameters
-    ----------
-    layer_position: string
-        current layer position in the network - first/next.
-
-    attributes_cmi: (dictionary) {attribute_index : conditional mutual information}
-        Contains the conditional mutual information of each attribute.
-
-    chosen_attribute_index: int or float
-        The chosen attribute index upon the network will be splited by.
-
-    chosen_attribute: string
-        The chosen attribute name upon the network will be splited by.
-
-
-
-    """
-    with open('output.txt', 'a') as f:
-        f.write(layer_position + ' layer attribute: \n')
-        for index, mi in attributes_cmi.items():
-            f.write(str(index) + ': ' + str(round(mi, 3)) + '\n')
-
-        if chosen_attribute_index != -1:
-            f.write('\nChosen attribute is: ' + chosen_attribute + "(" + str(chosen_attribute_index) + ")" + '\n\n')
-            # f.write('\nSplit points are: ' + str(split_points[chosen_attribute]) + '\n\n')
-        else:
-            f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute_index) + ")" + '\n\n')
-        f.close()
-
-
-def _drop_records(X, y, attribute_index, value):
-    """ Drop the samples in X which doesn't equal to value.
-
-    Parameters
-    ----------
-    x: {array-like, sparse matrix}, shape (n_samples, n_features)
-        The samples from a specific node.
-
-    y: (An array_like object of length n_samples)
-        Contains the true class labels for all the samples in X.
-
-    attribute_index: int
-        The index of the attribute upon the network will be splited by.
-
-    value: int or float
-        The data value to keep in x.
-
-
-    Returns
-    -------
-        np.array of the samples which their data value in attribute_index is equal to value.
-
-    """
-    new_x = []
-    new_y = []
-    for i in range(len(y)):
-        if X[i][attribute_index] == value:
-            new_x.append(X[i])
-            new_y.append(y[i])
-    return np.array(new_x), np.array(new_y)
-
-
-def _create_attribute_node(partial_X, partial_y, chosen_attribute_index, attribute_value, curr_node_index,
-                           prev_node_index):
-    """ Create an AttributeNode object which contain the partial_X and partial_y given.
-
-    Parameters
-    ----------
-    partial_X: {array-like, sparse matrix}, shape (n_samples, n_features)
-        Contains a partial samples from the train set.
-
-    partial_y: (An array_like object of length n_samples)
-        Contains the true class labels for all the samples in partial_X.
-
-    chosen_attribute_index: int
-        The chosen attribute index upon the node will be splited by.
-
-    attribute_value: int
-        The data value of the chosen attribute in this node.
-
-    curr_node_index: int
-        The index of the new AttributeNode which will be created
-
-    prev_node_index: int
-        The index of the previous node.
-
-    Returns
-    -------
-        A new AttributeNode object initial with the given parameters.
-    """
-
-    # Drop records where their value in chosen_attribute isn't equal to attribute_value
-    x_y_tuple = _drop_records(X=partial_X,
-                              y=partial_y,
-                              attribute_index=chosen_attribute_index,
-                              value=attribute_value)
-    # Create a new AttributeNode
-    attributes_node = AttributeNode(index=curr_node_index,
-                                    attribute_value=attribute_value,
-                                    prev_node=prev_node_index,
-                                    layer=chosen_attribute_index,
-                                    partial_x=x_y_tuple[0],
-                                    partial_y=x_y_tuple[1])
-    return attributes_node
-
-
-def _get_columns_type(X):
-    """ Finding the type of each column in X
-
-    Parameters
-    ----------
-    x: {array-like, sparse matrix}, shape (n_samples, n_features)
-        The samples in the train set.
-
-    Returns
-    -------
-        An array_like object of length n contains in each position the type of the corresponding attribute in X.
-
-    """
-    columns_type = []
-    for dt in X.columns:
-        if len(np.unique(X[dt])) > 10:
-            columns_type.append(str(X[dt].dtype))
-        else:
-            columns_type.append("category")
-    return columns_type
 
 
 class IfnClassifier():
@@ -300,13 +53,8 @@ class IfnClassifier():
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
 
-
-
-    # def _is_numeric(self, X):
-    #     if len(np.unique(X)) == 2:
-    #         return False
-
     def fit(self, X, y, sample_weight=None):
+
         """A reference implementation of a fitting function.
 
         Parameters
@@ -326,13 +74,13 @@ class IfnClassifier():
         cols = list(X.columns.values)
         cols = [str(i) for i in cols]
 
-        columns_type = _get_columns_type(X)
+        columns_type = Utils.get_columns_type(X)
 
         X, y = check_X_y(X, y, accept_sparse=True)
 
         self.total_records = len(y)
         unique, counts = np.unique(np.array(y), return_counts=True)
-        class_count = np.asarray((unique, counts)).T
+        self.class_count = np.asarray((unique, counts)).T
         self.num_of_classes = len(unique)
 
         # create list the holds the attributes indexes
@@ -380,10 +128,10 @@ class IfnClassifier():
                 if curr_node_index == 1:
                     print('No Nodes at the network. choose smaller alpha')
                     sys.exit()
-                _write_details_to_file(layer_position=layer,
-                                       attributes_cmi=attributes_mi,
-                                       chosen_attribute_index=global_chosen_attribute,
-                                       chosen_attribute=cols[global_chosen_attribute])
+                Utils.write_details_to_file(layer_position=layer,
+                                            attributes_cmi=attributes_mi,
+                                            chosen_attribute_index=global_chosen_attribute,
+                                            chosen_attribute=cols[global_chosen_attribute])
 
 
                 break
@@ -422,12 +170,12 @@ class IfnClassifier():
                         unique_values = np.unique(attribute_data_in_node)
                         prev_node = node.index
                         for i in unique_values:
-                            attribute_node = _create_attribute_node(partial_X=partial_X,
-                                                                    partial_y=partial_y,
-                                                                    chosen_attribute_index=global_chosen_attribute,
-                                                                    attribute_value=i,
-                                                                    curr_node_index=curr_node_index,
-                                                                    prev_node_index=prev_node)
+                            attribute_node = Utils.create_attribute_node(partial_X=partial_X,
+                                                                         partial_y=partial_y,
+                                                                         chosen_attribute_index=global_chosen_attribute,
+                                                                         attribute_value=i,
+                                                                         curr_node_index=curr_node_index,
+                                                                         prev_node_index=prev_node)
                             nodes_list.append(attribute_node)
                             curr_node_index += 1
                     # If the node isn't significant we will set it as terminal node later
@@ -437,12 +185,12 @@ class IfnClassifier():
             else:
                 prev_node = 0
                 for i in self.unique_values_per_attribute[global_chosen_attribute]:
-                    attribute_node = _create_attribute_node(partial_X=X,
-                                                            partial_y=y,
-                                                            chosen_attribute_index=global_chosen_attribute,
-                                                            attribute_value=i,
-                                                            curr_node_index=curr_node_index,
-                                                            prev_node_index=prev_node)
+                    attribute_node = Utils.create_attribute_node(partial_X=X,
+                                                                 partial_y=y,
+                                                                 chosen_attribute_index=global_chosen_attribute,
+                                                                 attribute_value=i,
+                                                                 curr_node_index=curr_node_index,
+                                                                 prev_node_index=prev_node)
                     nodes_list.append(attribute_node)
                     curr_node_index += 1
 
@@ -462,16 +210,18 @@ class IfnClassifier():
 
             # Set the un significant node as terminal nodes
             un_significant_nodes_set = list(set(un_significant_nodes))
-            self._set_terminal_nodes(un_significant_nodes_set, class_count)
+            self.set_terminal_nodes(un_significant_nodes_set, self.class_count)
 
             current_layer = next_layer
             number_of_layers += 1
 
-            _write_details_to_file(layer_position=layer,
-                                   attributes_cmi=attributes_mi,
-                                   chosen_attribute_index=global_chosen_attribute,
-                                   chosen_attribute=cols[global_chosen_attribute])
+            Utils.write_details_to_file(layer_position=layer,
+                                        attributes_cmi=attributes_mi,
+                                        chosen_attribute_index=global_chosen_attribute,
+                                        chosen_attribute=cols[global_chosen_attribute])
 
+            # overrides the value until the last iteration
+            self.last_layer_mi = attributes_mi[global_chosen_attribute]
             layer = 'next'
 
             attributes_indexes.remove(global_chosen_attribute)
@@ -481,8 +231,8 @@ class IfnClassifier():
 
         # Network building is done
         # Set the remaining nodes as terminals
-        self._set_terminal_nodes(nodes=current_layer.get_nodes(),
-                                 class_count=class_count)
+        self.set_terminal_nodes(nodes=current_layer.get_nodes(),
+                                class_count=self.class_count)
 
         with open('output.txt', 'a') as f:
             f.write('Total nodes created:' + str(curr_node_index) + "\n")
@@ -493,6 +243,7 @@ class IfnClassifier():
         self.is_fitted_ = True
         print("Done. Network is fitted")
 
+        self.training_error = self.calculate_error_rate(X=X, y=y)
         return self
 
     def predict(self, X):
@@ -518,8 +269,8 @@ class IfnClassifier():
             while curr_layer is not None and not found_terminal_node:
                 record_value = record[curr_layer.index]
                 if curr_layer.is_continuous:
-                    record_value = _find_split_position(value=record_value,
-                                                        positions=curr_layer.split_points)
+                    record_value = Utils.find_split_position(value=record_value,
+                                                             positions=curr_layer.split_points)
                 for node in curr_layer.nodes:
                     if node.attribute_value == record_value and node.prev_node == prev_node_index:
                         chosen_node = node
@@ -569,8 +320,8 @@ class IfnClassifier():
             while curr_layer is not None and not found_terminal_node:
                 record_value = record[curr_layer.index]
                 if curr_layer.is_continuous is not False:
-                    record_value = _find_split_position(value=record_value,
-                                                        positions=curr_layer.split_points)
+                    record_value = Utils.find_split_position(value=record_value,
+                                                             positions=curr_layer.split_points)
                 for node in curr_layer.nodes:
                     if node.attribute_value == record_value and node.prev_node == prev_node_index:
                         chosen_node = node
@@ -690,7 +441,7 @@ class IfnClassifier():
         attribute_data = list(X[:, attribute_index])
         self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
 
-        mutual_info_score = self._calculate_conditional_mutual_information(attribute_data, y)
+        mutual_info_score = self.calculate_conditional_mutual_information(attribute_data, y)
         statistic = 2 * np.log(2) * self.total_records * mutual_info_score
         critical = stats.chi2.ppf(self.alpha, ((self.num_of_classes - 1) *
                                                ((len(self.unique_values_per_attribute[attribute_index])) - 1)))
@@ -815,10 +566,10 @@ class IfnClassifier():
         for T in iterator:
             if T in self.split_points[attribute_index]: continue
             if nodes is None:
-                t_attribute_date, new_y = _split_data_to_two_intervals(interval=interval,
-                                                                        T=T,
-                                                                        min_value=min_value,
-                                                                        max_value=max_value)
+                t_attribute_date, new_y = Utils.split_data_to_two_intervals(interval=interval,
+                                                                            T=T,
+                                                                            min_value=min_value,
+                                                                            max_value=max_value)
 
                 if len(np.unique(t_attribute_date)) != 2:
                     break
@@ -838,10 +589,10 @@ class IfnClassifier():
                     attribute_data = list(partial_X[:, attribute_index])
                     data_class_array = list(zip(attribute_data, partial_y))
 
-                    t_attribute_date, new_y = _split_data_to_two_intervals(interval=data_class_array,
-                                                                           T=T,
-                                                                           min_value=min_value,
-                                                                           max_value=max_value)
+                    t_attribute_date, new_y = Utils.split_data_to_two_intervals(interval=data_class_array,
+                                                                                T=T,
+                                                                                min_value=min_value,
+                                                                                max_value=max_value)
 
                     if len(np.unique(t_attribute_date)) != 2:
                         how_many_nodes_exceeded += 1
@@ -881,7 +632,7 @@ class IfnClassifier():
 
             # Find the split point index in the interval using binary search
             l = [e[0] for e in interval]
-            split_point_index = _binary_search(l, 0, len(l), split_point)
+            split_point_index = Utils.binary_search(l, 0, len(l), split_point)
             # Split the interval into two intervals
             # smaller - includes all the elements where their value is smaller than split point
             interval_smaller = interval[0 : split_point_index]
@@ -943,17 +694,17 @@ class IfnClassifier():
             rel_num_of_classes = len(np.unique(np.array(y)))
             critical = stats.chi2.ppf(self.alpha, (rel_num_of_classes - 1))
 
-        t_mi = self._calculate_conditional_mutual_information(x=X, y=y)
+        t_mi = self.calculate_conditional_mutual_information(X=X, y=y)
         statistic = 2 * np.log(2) * self.total_records * t_mi
 
         return statistic, critical, t_mi
 
-    def _calculate_conditional_mutual_information(self, x, y):
+    def calculate_conditional_mutual_information(self, X, y):
         """ Calculate the conditional mutual information of the feature given in x.
 
         Parameters
         ----------
-        x: {array-like, sparse matrix}, shape (n_samples, 1_feature)
+        X: {array-like, sparse matrix}, shape (n_samples, 1_feature)
             Contains the data of one feature overall samples in the train set.
 
         y: (An array_like object of length n_samples)
@@ -973,7 +724,7 @@ class IfnClassifier():
         # <class, number_of_appearances>
         class_count = dict(zip(unique, counts))
         # count the number of distinct values in x
-        unique, counts = np.unique(np.array(x), return_counts=True)
+        unique, counts = np.unique(np.array(X), return_counts=True)
         # <value, number_of_appearances>
         data_count = dict(zip(unique, counts))
 
@@ -981,7 +732,7 @@ class IfnClassifier():
 
         # Count the number of appearances for each tuple x[i],y[i]
         for i in range(len(y)):
-            data_dic[x[i], y[i]] = data_dic[x[i], y[i]] + 1
+            data_dic[X[i], y[i]] = data_dic[X[i], y[i]] + 1
 
         total_cmi = 0
 
@@ -1104,16 +855,16 @@ class IfnClassifier():
                     partial_x = node.partial_x
                     # convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
                     for record in partial_x:
-                        record[chosen_attribute] = _find_split_position(value=record[chosen_attribute],
-                                                                        positions=chosen_split_points)
+                        record[chosen_attribute] = Utils.find_split_position(value=record[chosen_attribute],
+                                                                             positions=chosen_split_points)
         # First layer
         else:
             # Convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
             for record in partial_X:
-                record[chosen_attribute] = _find_split_position(value=record[chosen_attribute],
-                                                                positions=chosen_split_points)
+                record[chosen_attribute] = Utils.find_split_position(value=record[chosen_attribute],
+                                                                     positions=chosen_split_points)
 
-    def _set_terminal_nodes(self, nodes, class_count):
+    def set_terminal_nodes(self, nodes, class_count):
         """ Connecting the given nodes to the terminal nodes in the network.
 
         Parameters

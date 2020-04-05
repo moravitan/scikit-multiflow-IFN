@@ -4,11 +4,11 @@ import pickle
 import numpy as np
 import pandas as pd
 from skml import IfnClassifier
-from skml import MetaLearning
+from skml.IOLIN import MetaLearning
 from skmultiflow.data import SEAGenerator
 
 
-class OnlineNetwork:
+class OnlineNetworkRegenerative:
 
 
     def __init__(self,
@@ -75,6 +75,7 @@ class OnlineNetwork:
         self.meta_learning = MetaLearning(alpha, number_of_classes)
         self.data_stream_generator = data_stream_generator
         self.data_stream_generator.prepare_for_use()
+        self.counter = 1
 
     def regenerate(self):
         """ This function is an implementation to the regenerative algorithm as represented
@@ -90,7 +91,6 @@ class OnlineNetwork:
 
         """
 
-        counter = 1
         self.window = self.meta_learning.calculate_Wint(self.Pe)
         i = self.n_min - self.window
         j = self.window
@@ -145,8 +145,8 @@ class OnlineNetwork:
                 i = j - self.window
                 add_count = max(add_count * (1 - (self.red_add_count / 100)), self.min_add_count)
 
-            path = self.path + "/" + str(counter)
+            path = self.path + "/" + str(self.counter)
             pickle.dump(self.classifier, open(path, "wb"))
-            counter = counter + 1
+            self.counter = self.counter + 1
             X_batch.clear()
             y_batch.clear()
