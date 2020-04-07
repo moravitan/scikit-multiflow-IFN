@@ -1,4 +1,5 @@
 import math
+import copy
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -7,13 +8,13 @@ from skmultiflow.data import SEAGenerator
 from skml import IfnClassifier
 from skml.IOLIN import MetaLearning
 import skml.Utils as Utils
-
+from skml._ifn_network import HiddenLayer
 
 
 class BasicIncremental:
 
     def __init__(self,
-                 classifier:IfnClassifier,
+                 classifier: IfnClassifier,
                  path,
                  number_of_classes=2,
                  n_min=378,
@@ -80,11 +81,11 @@ class BasicIncremental:
         self.data_stream_generator.prepare_for_use()
 
     @property
-    def classifier (self):
+    def classifier(self):
         return self._classifier
 
     @classifier.setter
-    def classifier(self, value:IfnClassifier):
+    def classifier(self, value: IfnClassifier):
         self._classifier = value
 
     def IN_controll(self):
@@ -148,13 +149,12 @@ class BasicIncremental:
                                                    Eval=Eval,
                                                    add_count=add_count)
 
-        if abs(Eval - Etr) < max_diff: # concept is stable
+        if abs(Eval - Etr) < max_diff:  # concept is stable
             self._update_current_network(training_window_X=training_window_X,
                                          training_window_y=training_window_y)
-        else: # concept drift detected
+        else:  # concept drift detected
             self._induce_new_model(training_window_X=training_window_X,
                                    training_window_y=training_window_y)
-
 
     def _update_current_network(self, training_window_X, training_window_y):
 
@@ -171,34 +171,84 @@ class BasicIncremental:
 
     def _check_split_validation(self, training_window_X, training_window_y):
 
+        copy_network = self._clone_network(training_window_X=training_window_X,
+                                           training_window_y=training_window_y)
+
+        curr_layer = copy_network.root_node.first_layer
         un_significant_nodes = []
-        curr_layer = self.classifier.network.root_node.first_layer
+        un_significant_nodes_indexes = []
 
         while curr_layer is not None:
-            nodes = curr_layer.nodes
-            for node in nodes:
-                if not node.is_terminal:
-                    X, y = Utils.drop_records(X=training_window_X,
-                                              y=training_window_y,
-                                              attribute_index=curr_layer.index,
-                                              value=node.inner_index)
+            for node in curr_layer.nodes:
+                X = node.partial_X
+                y = node.partial_y
+                attribute_data = list(X[:, curr_layer.index])
+                unique_values = np.unique(attribute_data)
+                conditional_mutual_information = \
+                    self.classifier.calculate_conditional_mutual_information(X=attribute_data,
+                                                                             y=y)
 
-                    attribute_data = list(X[:, curr_layer.index])
-                    unique_values = np.unique(attribute_data)
+                statistic = 2 * np.log(2) * len(y) * conditional_mutual_information
+                critical = stats.chi2.ppf(self.alpha, ((self.number_of_classes - 1) * (len(unique_values) - 1)))
 
-                    conditional_mutual_information = \
-                        self.classifier.calculate_conditional_mutual_information(X=training_window_X,
-                                                                                 y=training_window_y)
+                if critical < statistic:
+                    continue
+                else:
+                    un_significant_nodes_indexes.append(node.index)
+                    un_significant_nodes.append(node)
 
-                    statistic = 2 * np.log(2) * len(training_window_y) * conditional_mutual_information
-                    critical = stats.chi2.ppf(self.alpha, ((self.number_of_classes - 1) * (len(unique_values) - 1)))
-
-                    if critical < statistic:
-                        continue
-                    else:
-                        un_significant_nodes.append(node)
             self.classifier.set_terminal_nodes(nodes=un_significant_nodes,
                                                class_count=self.classifier.class_count)
+
+            BasicIncremental.eliminate_nodes(nodes=set(un_significant_nodes_indexes),
+                                             layer=curr_layer.next,
+                                             prev_layer=curr_layer)
+            curr_layer = curr_layer.next
+
+    def _clone_network(self, training_window_X, training_window_y):
+
+        copy_network = copy.copy(self.classifier.network)
+        training_window_X_copy = training_window_X.copy()
+        training_window_y_copy = training_window_y.copy()
+
+        curr_layer = copy_network.root_node.first_layer
+        is_first_layer = True
+        nodes_data = {}
+        while curr_layer is not None:
+            for node in curr_layer.nodes:
+                if is_first_layer:
+                    if curr_layer.is_continuous:
+                        Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
+                                                     chosen_attribute=curr_layer.index,
+                                                     layer=None,
+                                                     partial_X=training_window_X_copy)
+
+                    partial_X, partial_y = Utils.drop_records(X=training_window_X_copy,
+                                                              y=training_window_y_copy,
+                                                              attribute_index=curr_layer.index,
+                                                              value=node.inner_index)
+                    node.partial_X = partial_X
+                    node.partial_y = partial_y
+                    nodes_data[node.index] = [partial_X, partial_y]
+
+                else:
+                    X = nodes_data[node.prev_node][0]
+                    y = nodes_data[node.prev_node][1]
+                    if curr_layer.is_continuous:
+                        Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
+                                                     chosen_attribute=curr_layer.index,
+                                                     layer=None,
+                                                     partial_X=X)
+
+                    partial_X, partial_y = Utils.drop_records(X=X,
+                                                              y=y,
+                                                              attribute_index=curr_layer.index,
+                                                              value=node.inner_index)
+                    node.partial_X = partial_X
+                    node.partial_y = partial_y
+                    nodes_data[node.index] = [partial_X, partial_y]
+
+        return copy_network
 
     def _check_replacement_of_last_layer(self, training_window_X, training_window_y):
 
@@ -216,3 +266,27 @@ class BasicIncremental:
 
     def _induce_new_model(self, training_window_X, training_window_y):
         self.classifier = self.classifier.fit(training_window_X, training_window_y)
+
+    @staticmethod
+    def eliminate_nodes(nodes, layer, prev_layer):
+        next_layer_nodes = []
+        nodes_to_eliminate = []
+
+        if nodes is None or len(nodes) == 0 or layer is None:
+            return
+
+        curr_layer_nodes = layer.nodes
+        for node in curr_layer_nodes:
+            if node.prev_node in nodes:
+                nodes_to_eliminate.append(node)
+                next_layer_nodes.append(node)
+
+        for node in nodes_to_eliminate:
+            layer.nodes.remove(node)
+
+        if len(layer.nodes) == 0:
+            prev_layer.next_layer = layer.next_layer
+
+        BasicIncremental.eliminate_nodes(nodes=next_layer_nodes,
+                                         layer=layer.next_layer,
+                                         prev_layer=layer)
