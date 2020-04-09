@@ -77,15 +77,10 @@ class PureMultiple:
         self.data_stream_generator.prepare_for_use()
 
     def pure_model_generation(self):
-        """ This function is an implementation to the regenerative algorithm as represented
-            by Prof. Mark Last in "https://content.iospress.com/articles/intelligent-data-analysis/ida00083".
-
+        """ This function is an implementation of Pure Multiple Model IOLIN algorithm as represented
+            by Prof. Mark Last, et al. in "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X".
             This function obtain an IFN model for every window arriving in the stream,
             and validate the prediction on the next window, which represent the validation examples.
-            The size of the window depends on the stability of the information, if the data is stable,
-            the size of the window increase, otherwise (a concept drift detect) the size of the window
-            re-calculate.
-
             After each iteration the IFN model is saved to a file in the path given by the user.
 
         """
