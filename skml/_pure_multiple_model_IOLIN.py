@@ -64,6 +64,7 @@ class PureMultiple:
         self.n_min = n_min
         self.n_max = n_max
         self.Pe = Pe
+        self.alpha = alpha
         self.init_add_count = init_add_count
         self.inc_add_count = inc_add_count
         self.max_add_count = max_add_count
@@ -89,24 +90,9 @@ class PureMultiple:
 
         """
 
-        """
-        Pure Multiple Model IOLIN
-        Input: Training window T, current network model, past network models
-        Output: Former/New network model
-        For each new training window
-            Search for the best network from the past by:
-            1. Comparing the value of the target entropy (based on the
-            current window data) to entropy values in all windows where a
-            totally new network was built.
-            2. Choose Network with Min |Ecurrent(T)–Eformer(T)|.
-            3. Add new layers if possible.
-            If a concept drift is detected again with the chosen network
-            Create totally new network using the IN algorithm
-        """
-
         counter = 1
         self.window = self.meta_learning.calculate_Wint(self.Pe)
-        i = self.n_min - self.window
+        i = 0
         j = self.window
         add_count = self.init_add_count
         X_batch = []
@@ -121,55 +107,44 @@ class PureMultiple:
                 i = i + 1
             X_batch_df = pd.DataFrame(X_batch)
 
-            classifier_files_names = os.listdir("generatedModels")
-            generated_classifiers = {}
-            for classifier in classifier_files_names:
-                generated_clf = pickle.load(open("generatedModels/" + classifier, "rb"))
-                generated_classifiers[classifier] = generated_clf.calculate_error_rate(X_batch_df, y_batch)
-            chosen_classifier_name = min(generated_classifiers, key=generated_classifiers.get)
-            chosen_classifier = pickle.load(open("generatedModels/" + chosen_classifier_name, "rb"))
+            if os.path.exists(self.path) and len(os.listdir(self.path)) > 0:
+                classifier_files_names = os.listdir(self.path)
+                generated_classifiers = {}
+                for classifier in classifier_files_names:
+                    generated_clf = pickle.load(open(self.path + "/" + classifier, "rb"))
+                    generated_classifiers[classifier] = abs(generated_clf.calculate_error_rate(X_batch_df, y_batch) -
+                                                            classifier.calculate_error_rate(X_batch_df, y_batch))
+                chosen_classifier_name = min(generated_classifiers, key=generated_classifiers.get)
+                chosen_classifier = pickle.load(open(self.path + "/" + chosen_classifier_name, "rb"))
 
-            if generated_classifiers[chosen_classifier] > self.Pe:  # concept drift detected
+                Etr = generated_classifiers[chosen_classifier]
+
+                k = j + add_count
+                X_validation_samples = []
+                y_validation_samples = []
+
+                while j < k:
+                    X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
+                    j = j + 1
+
+                Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
+                max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
+
+                if abs(Eval - Etr) > max_diff:  # concept drift detected
+                    chosen_classifier = IfnClassifier(self.alpha)
+                    chosen_classifier.fit(X_batch_df, y_batch)
+                    path = self.path + "/" + str(counter)
+                    pickle.dump(self.classifier, open(path, "wb"))
+                    counter = counter + 1
+
+            else:  # cold start
                 chosen_classifier = IfnClassifier(self.alpha)
                 chosen_classifier.fit(X_batch_df, y_batch)
-                chosen_classifier_name = "need to todo"
+                path = self.path + "/" + str(counter) + ".pickle"
+                pickle.dump(self.classifier, open(path, "wb"))
+                counter = counter + 1
 
-            pickle.dump(chosen_classifier, open("generatedModels/" + chosen_classifier_name, "wb"))
+            j = j + self.window
 
-            Etr = self.classifier.calculate_error_rate(X_batch, y_batch)
-
-            k = j + add_count
-            X_validation_samples = []
-            y_validation_samples = []
-
-            while j < k:
-                X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
-                j = j + 1
-
-            j = k
-            Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
-            max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
-
-            if abs(Eval - Etr) < max_diff:  # concept is stable
-                print("++++++++++++++++")
-                print("model is stable")
-                print("++++++++++++++++")
-                add_count = min(add_count * (1 + (self.inc_add_count / 100)), self.max_add_count)
-                self.window = min(self.window + add_count, self.max_window)
-                self.meta_learning.window(self.window)
-                i = j - self.window
-
-            else:  # concept drift detected
-                print("**********************")
-                print("concept drift detected")
-                print("**********************")
-                unique, counts = np.unique(np.array(y_batch), return_counts=True)
-                target_distribution = counts[0] / len(y_batch)
-                NI = len(self.classifier.network.root_node.first_layer.nodes)
-                self.window = self.meta_learning.calculate_new_window(NI, target_distribution, Etr)
-                i = j - self.window
-                add_count = max(add_count * (1 - (self.red_add_count / 100)), self.min_add_count)
-
-            path = self.path + "/" + str(counter)
-            pickle.dump(self.classifier, open(path, "wb"))
-            counter = counter + 1
+        last_model = pickle.load(open(self.path + "/" + str(counter - 1) + ".pickle", "rb"))
+        return last_model
