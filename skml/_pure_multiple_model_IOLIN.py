@@ -1,6 +1,6 @@
 import math
 import pickle
-
+import os
 import numpy as np
 import pandas as pd
 from skml import IfnClassifier
@@ -8,7 +8,7 @@ from skml import MetaLearning
 from skmultiflow.data import SEAGenerator
 
 
-class OnlineNetwork:
+class PureMultiple:
 
     def __init__(self,
                  classifier: IfnClassifier,
@@ -64,6 +64,7 @@ class OnlineNetwork:
         self.n_min = n_min
         self.n_max = n_max
         self.Pe = Pe
+        self.alpha = alpha
         self.init_add_count = init_add_count
         self.inc_add_count = inc_add_count
         self.max_add_count = max_add_count
@@ -75,23 +76,18 @@ class OnlineNetwork:
         self.data_stream_generator = data_stream_generator
         self.data_stream_generator.prepare_for_use()
 
-    def regenerate(self):
-        """ This function is an implementation to the regenerative algorithm as represented
-            by Prof. Mark Last in "https://content.iospress.com/articles/intelligent-data-analysis/ida00083".
-
+    def pure_model_generation(self):
+        """ This function is an implementation of Pure Multiple Model IOLIN algorithm as represented
+            by Prof. Mark Last, et al. in "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X".
             This function obtain an IFN model for every window arriving in the stream,
             and validate the prediction on the next window, which represent the validation examples.
-            The size of the window depends on the stability of the information, if the data is stable,
-            the size of the window increase, otherwise (a concept drift detect) the size of the window
-            re-calculate.
-
             After each iteration the IFN model is saved to a file in the path given by the user.
 
         """
 
         counter = 1
         self.window = self.meta_learning.calculate_Wint(self.Pe)
-        i = self.n_min - self.window
+        i = 0
         j = self.window
         add_count = self.init_add_count
         X_batch = []
@@ -104,43 +100,46 @@ class OnlineNetwork:
                 X_batch.append(X[0])
                 y_batch.append(y[0])
                 i = i + 1
-
             X_batch_df = pd.DataFrame(X_batch)
-            self.classifier.fit(X_batch_df, y_batch)
-            Etr = self.classifier.calculate_error_rate(X_batch, y_batch)
 
-            k = j + add_count
-            X_validation_samples = []
-            y_validation_samples = []
+            if os.path.exists(self.path) and len(os.listdir(self.path)) > 0:
+                classifier_files_names = os.listdir(self.path)
+                generated_classifiers = {}
+                for classifier in classifier_files_names:
+                    generated_clf = pickle.load(open(self.path + "/" + classifier, "rb"))
+                    generated_classifiers[classifier] = abs(generated_clf.calculate_error_rate(X_batch_df, y_batch) -
+                                                            classifier.calculate_error_rate(X_batch_df, y_batch))
+                chosen_classifier_name = min(generated_classifiers, key=generated_classifiers.get)
+                chosen_classifier = pickle.load(open(self.path + "/" + chosen_classifier_name, "rb"))
 
-            while j < k:
-                X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
-                j = j + 1
+                Etr = generated_classifiers[chosen_classifier]
 
-            j = k
-            Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
-            max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
+                k = j + add_count
+                X_validation_samples = []
+                y_validation_samples = []
 
-            if abs(Eval - Etr) < max_diff:  # concept is stable
-                print("++++++++++++++++")
-                print("model is stable")
-                print("++++++++++++++++")
-                add_count = min(add_count * (1 + (self.inc_add_count / 100)), self.max_add_count)
-                self.window = min(self.window + add_count, self.max_window)
-                self.meta_learning.window(self.window)
-                i = j - self.window
+                while j < k:
+                    X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
+                    j = j + 1
 
-            else:  # concept drift detected
-                print("**********************")
-                print("concept drift detected")
-                print("**********************")
-                unique, counts = np.unique(np.array(y_batch), return_counts=True)
-                target_distribution = counts[0] / len(y_batch)
-                NI = len(self.classifier.network.root_node.first_layer.nodes)
-                self.window = self.meta_learning.calculate_new_window(NI, target_distribution, Etr)
-                i = j - self.window
-                add_count = max(add_count * (1 - (self.red_add_count / 100)), self.min_add_count)
+                Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
+                max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
 
-            path = self.path + "/" + str(counter)
-            pickle.dump(self.classifier, open(path, "wb"))
-            counter = counter + 1
+                if abs(Eval - Etr) > max_diff:  # concept drift detected
+                    chosen_classifier = IfnClassifier(self.alpha)
+                    chosen_classifier.fit(X_batch_df, y_batch)
+                    path = self.path + "/" + str(counter)
+                    pickle.dump(self.classifier, open(path, "wb"))
+                    counter = counter + 1
+
+            else:  # cold start
+                chosen_classifier = IfnClassifier(self.alpha)
+                chosen_classifier.fit(X_batch_df, y_batch)
+                path = self.path + "/" + str(counter) + ".pickle"
+                pickle.dump(self.classifier, open(path, "wb"))
+                counter = counter + 1
+
+            j = j + self.window
+
+        last_model = pickle.load(open(self.path + "/" + str(counter - 1) + ".pickle", "rb"))
+        return last_model
