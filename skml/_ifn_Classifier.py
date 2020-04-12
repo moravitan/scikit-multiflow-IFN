@@ -14,7 +14,6 @@ import sys
 import skml.Utils as Utils
 
 
-
 class IfnClassifier():
     """ A template estimator to be used as a reference implementation.
 
@@ -34,6 +33,10 @@ class IfnClassifier():
         if 0 <= alpha < 1:
             self.alpha = alpha
             self.max_number_of_layers = max_number_of_layers
+            self.is_fitted = False
+            self.training_error = 0
+            self.cmi_sec_best_att = 0
+            self.index_of_sec_best_att = 0
             self.total_records = 0
             # Number of classes in the target
             self.num_of_classes = 0
@@ -90,6 +93,7 @@ class IfnClassifier():
         number_of_layers = 0
         curr_node_index = 1
         current_layer = None
+        attributes_mi = {}
 
         self.network.build_target_layer(unique)
 
@@ -132,7 +136,6 @@ class IfnClassifier():
                                             attributes_cmi=attributes_mi,
                                             chosen_attribute_index=global_chosen_attribute,
                                             chosen_attribute=cols[global_chosen_attribute])
-
 
                 break
 
@@ -240,10 +243,13 @@ class IfnClassifier():
             f.write("Running time: " + str(round(end - start, 3)) + " Sec")
             f.close()
 
-        self.is_fitted_ = True
+        self.is_fitted = True
         print("Done. Network is fitted")
 
         self.training_error = self.calculate_error_rate(X=X, y=y)
+        self.index_of_sec_best_att, self.cmi_sec_best_att = \
+            self.calculate_second_best_attribute_of_last_layer(attributes_mi=attributes_mi)
+
         return self
 
     def predict(self, X):
@@ -384,7 +390,7 @@ class IfnClassifier():
         for attribute_index in attributes_indexes:
             node_mi_per_attribute[attribute_index] = []
             is_continuous = 'category' not in columns_type[attribute_index]
-            #first layer
+            # first layer
             if nodes is None:
                 if is_continuous:
                     self._choose_split_numeric_attribute(attribute_index=attribute_index,
@@ -635,9 +641,9 @@ class IfnClassifier():
             split_point_index = Utils.binary_search(l, 0, len(l), split_point)
             # Split the interval into two intervals
             # smaller - includes all the elements where their value is smaller than split point
-            interval_smaller = interval[0 : split_point_index]
+            interval_smaller = interval[0: split_point_index]
             # larger - includes all the elements where their value is equal or higher than split point
-            interval_larger = interval[split_point_index : ]
+            interval_larger = interval[split_point_index:]
 
             # Found the nodes which are significant to the founded split point
             if nodes is not None:
@@ -894,3 +900,31 @@ class IfnClassifier():
 
         error_rate = (len(y) - correct) / len(y)
         return error_rate
+
+    def calculate_second_best_attribute_of_last_layer(self, attributes_mi:dict):
+        """ This function finds and return the attribute index of the second best conditional mutual information
+            based on the given dictionary.
+
+        Parameters
+        ----------
+        attributes_mi: dict
+            dictionary represent the conditional mutual information of each attribute.
+
+        Returns
+        -------
+            The attribute index of the second best conditional mutual information
+        """
+
+        attributes_mi_copy = attributes_mi.copy()
+
+        index_of_max_cmi = max(attributes_mi_copy, key=attributes_mi.get)
+        attributes_mi_copy.pop(index_of_max_cmi)
+        index_of_second_best = max(attributes_mi_copy, key=attributes_mi.get)
+
+        if attributes_mi_copy[index_of_second_best] == 0:
+            index_of_second_best = -1
+
+        return index_of_second_best
+
+
+

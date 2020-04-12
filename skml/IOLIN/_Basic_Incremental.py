@@ -158,13 +158,12 @@ class BasicIncremental:
 
     def _update_current_network(self, training_window_X, training_window_y):
 
-        self._check_split_validation(training_window_X=pd.DataFrame(training_window_X),
-                                     training_window_y=training_window_y)
+        copy_network = self._check_split_validation(training_window_X=pd.DataFrame(training_window_X),
+                                                    training_window_y=training_window_y)
 
-        is_last_layer_changed, sec_best_att = self._check_replacement_of_last_layer(training_window_X=training_window_X,
-                                                                                    training_window_y=training_window_y)
+        should_replace, significant_nodes_indexes = self._check_replacement_of_last_layer(copy_network=copy_network)
 
-        if is_last_layer_changed:
+        if should_replace:
             # TODO replace last layer with sec_best_att
             self._new_split_process(training_window_X=training_window_X,
                                     training_window_y=training_window_y)
@@ -180,22 +179,16 @@ class BasicIncremental:
 
         while curr_layer is not None:
             for node in curr_layer.nodes:
-                X = node.partial_X
-                y = node.partial_y
-                attribute_data = list(X[:, curr_layer.index])
-                unique_values = np.unique(attribute_data)
-                conditional_mutual_information = \
-                    self.classifier.calculate_conditional_mutual_information(X=attribute_data,
-                                                                             y=y)
+                if node.is_terminal is False:
+                    statistic, critical, cmi = \
+                        self._calculate_conditional_mutual_information_of_current_window(node=node,
+                                                                                         index=curr_layer.index)
 
-                statistic = 2 * np.log(2) * len(y) * conditional_mutual_information
-                critical = stats.chi2.ppf(self.alpha, ((self.number_of_classes - 1) * (len(unique_values) - 1)))
-
-                if critical < statistic:
-                    continue
-                else:
-                    un_significant_nodes_indexes.append(node.index)
-                    un_significant_nodes.append(node)
+                    if critical < statistic:
+                        continue
+                    else:
+                        un_significant_nodes_indexes.append(node.index)
+                        un_significant_nodes.append(node)
 
             self.classifier.set_terminal_nodes(nodes=un_significant_nodes,
                                                class_count=self.classifier.class_count)
@@ -204,6 +197,8 @@ class BasicIncremental:
                                              layer=curr_layer.next,
                                              prev_layer=curr_layer)
             curr_layer = curr_layer.next
+
+        return copy_network
 
     def _clone_network(self, training_window_X, training_window_y):
 
@@ -250,16 +245,74 @@ class BasicIncremental:
 
         return copy_network
 
-    def _check_replacement_of_last_layer(self, training_window_X, training_window_y):
+    def _check_replacement_of_last_layer(self, copy_network):
 
         should_replace = False
         conditional_mutual_information_first_best_att = self.classifier.last_layer_mi
-        conditional_mutual_information_second_best_att = 0
+        index_of_second_best_att = self.classifier.index_of_sec_best_att
+
+        if index_of_second_best_att == -1: # There's only one significant attribute
+            return should_replace
+
+        conditional_mutual_information_second_best_att, significant_nodes_indexes = \
+            self._calculate_cmi_of_sec_best_attribute(copy_network=copy_network,
+                                                      sec_best_index=index_of_second_best_att)
 
         if conditional_mutual_information_first_best_att < conditional_mutual_information_second_best_att:
             should_replace = True
 
-        return should_replace, conditional_mutual_information_second_best_att
+        return should_replace, significant_nodes_indexes
+
+    def _calculate_cmi_of_sec_best_attribute(self, copy_network, sec_best_index):
+
+        conditional_mutual_information = 0
+        significant_nodes_indexes = []
+        curr_layer = copy_network.root_node.first_layer
+
+        while curr_layer.next.next is not None: # loop until last split
+            curr_layer = curr_layer.next
+
+        last_layer_nodes = curr_layer.nodes
+
+        for node in last_layer_nodes:
+            statistic, critical, cmi = \
+                self._calculate_conditional_mutual_information_of_current_window(node=node,
+                                                                                 index=sec_best_index)
+            if critical < statistic:  # significant
+                conditional_mutual_information += conditional_mutual_information + cmi
+                significant_nodes_indexes.append(node.index)
+
+        return conditional_mutual_information, set(significant_nodes_indexes)
+
+    def _calculate_conditional_mutual_information_of_current_window(self, node, index):
+
+        X = node.partial_X
+        y = node.partial_y
+        attribute_data = list(X[:, index])
+        unique_values = np.unique(attribute_data)
+        conditional_mutual_information = \
+            self.classifier.calculate_conditional_mutual_information(X=attribute_data,
+                                                                     y=y)
+
+        statistic = 2 * np.log(2) * len(y) * conditional_mutual_information
+        critical = stats.chi2.ppf(self.alpha, ((self.number_of_classes - 1) * (len(unique_values) - 1)))
+
+        return statistic, critical, conditional_mutual_information
+
+    def _replace_last_layer(self, significant_nodes_indexes):
+
+        curr_layer = self.classifier.network.root_node.first_layer
+
+        while curr_layer.next.next is not None:  # loop until last split
+            curr_layer = curr_layer.next
+
+        last_layer_nodes = curr_layer.nodes
+
+        for node in last_layer_nodes:
+            if node.index in significant_nodes_indexes:
+                pass # TODO replace last layer with sec best attribute
+            else:
+                node.is_terminal = True
 
     def _new_split_process(self, training_window_X, training_window_y):
         pass
