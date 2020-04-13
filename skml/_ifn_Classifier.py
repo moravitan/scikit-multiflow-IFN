@@ -47,13 +47,13 @@ class IfnClassifier():
             # Dictionary that contains all the split points for each attribute
             self.split_points = {}
             # Dictionary that contains for each node and attribute all the split points founded significant
-            self.nodes_splited_per_attribute = {}
+            self.nodes_splitted_per_attribute = {}
             # Dictionary that contains for each numeric attribute it's data interval
             self.intervals_per_attribute = {}
             # array-like that contains for each group of split points the nodes founded significant and the
             # conditional mutual information.
             # Example: [[frozenset: {'1,7,10'}, list<AttributeNode>, float: conditional mutual information]..]
-            self.splited_nodes_by_split_points = []
+            self.splitted_nodes_by_split_points = []
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
@@ -160,7 +160,7 @@ class IfnClassifier():
                     # Check if the node is significant by the chosen attribute
                     # For both cases: continuous feature and categorical feature
                     if is_continuous:
-                        if node in set(self.nodes_splited_per_attribute[global_chosen_attribute]):
+                        if node in set(self.nodes_splitted_per_attribute[global_chosen_attribute]):
                             attributes_mi_per_node = 1
                         else:
                             attributes_mi_per_node = 0
@@ -231,7 +231,7 @@ class IfnClassifier():
 
             attributes_indexes.remove(global_chosen_attribute)
             self.split_points.clear()
-            self.nodes_splited_per_attribute.clear()
+            self.nodes_splitted_per_attribute.clear()
             significant_attributes_per_node.clear()
 
         # Network building is done
@@ -407,10 +407,10 @@ class IfnClassifier():
                                                              attributes_mi=attributes_mi)
             else:
                 if is_continuous:
-                    splited_nodes = self._choose_split_numeric_attribute(attribute_index=attribute_index,
+                    splitted_nodes = self._choose_split_numeric_attribute(attribute_index=attribute_index,
                                                                          attributes_mi=attributes_mi,
                                                                          nodes=nodes)
-                    self.nodes_splited_per_attribute[attribute_index] = splited_nodes
+                    self.nodes_splitted_per_attribute[attribute_index] = splitted_nodes
                 else:
                     for node in nodes:
                         node_mi = self._choose_split_categorical_attribute(X=node.partial_x,
@@ -492,7 +492,7 @@ class IfnClassifier():
         """
 
         self.split_points[attribute_index] = []
-        splited_nodes = []
+        splitted_nodes = []
         new_total_mi = 0
         # first layer
         if nodes is None:
@@ -505,21 +505,21 @@ class IfnClassifier():
                                  interval=self.intervals_per_attribute[attribute_index],
                                  nodes=nodes)
 
-            if bool(self.splited_nodes_by_split_points):
-                total_mi = [el[2] for el in self.splited_nodes_by_split_points]
+            if bool(self.splitted_nodes_by_split_points):
+                total_mi = [el[2] for el in self.splitted_nodes_by_split_points]
                 max_mi = max(total_mi)
                 max_mi_index = total_mi.index(max_mi)
-                self.split_points[attribute_index] = list(self.splited_nodes_by_split_points[max_mi_index][0])
+                self.split_points[attribute_index] = list(self.splitted_nodes_by_split_points[max_mi_index][0])
                 new_total_mi = max_mi
-                splited_nodes = list(self.splited_nodes_by_split_points[max_mi_index][1])
-                self.splited_nodes_by_split_points.clear()
+                splitted_nodes = list(self.splitted_nodes_by_split_points[max_mi_index][1])
+                self.splitted_nodes_by_split_points.clear()
 
         if bool(self.split_points[attribute_index]):  # there are split points
             attributes_mi[attribute_index] = new_total_mi
         else:
             attributes_mi[attribute_index] = 0
 
-        return splited_nodes
+        return splitted_nodes
 
     def _discretization(self, attribute_index, interval, total_mi=0, nodes=None, prev_split_points=None):
         """ A recursive implementation of a discretization of the IFN algorithm according to the algorithm
@@ -559,8 +559,8 @@ class IfnClassifier():
         split_point_mi_map = {}
         # mapping for each node the mutual information of every possible split point
         node_mi_per_threshold = {}
-        # list to save the nodes which can be splited by the founded split point
-        splited_nodes = []
+        # list to save the nodes which can be splitted by the founded split point
+        splitted_nodes = []
         # save the olf total mutual information in case no split point will be founded
         new_total_mi = total_mi
         # Counter for the number of nodes we don't need to check anymore
@@ -656,28 +656,28 @@ class IfnClassifier():
                     if node.index in node_mi_per_threshold.keys() \
                             and split_point in node_mi_per_threshold[node.index].keys() \
                             and node_mi_per_threshold[node.index][split_point] > 0:
-                        splited_nodes.append(node)
+                        splitted_nodes.append(node)
             else:
-                splited_nodes = None
+                splitted_nodes = None
 
             new_total_mi += split_point_mi_map[split_point]
 
             if curr_previous_split_points is not None:
                 split_point_set = frozenset(curr_previous_split_points)
-                self.splited_nodes_by_split_points.append([split_point_set, splited_nodes, new_total_mi])
+                self.splitted_nodes_by_split_points.append([split_point_set, splitted_nodes, new_total_mi])
                 curr_previous_split_points = frozenset(curr_previous_split_points)
 
             if bool(interval_smaller):
                 self._discretization(attribute_index=attribute_index,
                                      total_mi=new_total_mi,
                                      interval=interval_smaller,
-                                     nodes=splited_nodes,
+                                     nodes=splitted_nodes,
                                      prev_split_points=curr_previous_split_points)
             if bool(interval_larger):
                 self._discretization(attribute_index=attribute_index,
                                      total_mi=new_total_mi,
                                      interval=interval_larger,
-                                     nodes=splited_nodes,
+                                     nodes=splitted_nodes,
                                      prev_split_points=curr_previous_split_points)
         return new_total_mi
 
@@ -844,7 +844,7 @@ class IfnClassifier():
             Contains all the chosen split points founded significant for the chosen_attribute.
 
         chosen_attribute: int
-            The index of the attribute upon the network will be splited by.
+            The index of the attribute upon the network will be splitted by.
 
         layer: HiddenLayer
             The current HiddenLayer in the network.
@@ -859,10 +859,10 @@ class IfnClassifier():
         chosen_split_points.sort()
 
         if layer is not None:
-            # Get the nodes which should be splited by the chosen attribute
-            splited_nodes = set(self.nodes_splited_per_attribute[chosen_attribute])
+            # Get the nodes which should be splitted by the chosen attribute
+            splitted_nodes = set(self.nodes_splitted_per_attribute[chosen_attribute])
             for node in layer.get_nodes():
-                if node in splited_nodes:
+                if node in splitted_nodes:
                     partial_x = node.partial_x
                     # convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
                     for record in partial_x:
