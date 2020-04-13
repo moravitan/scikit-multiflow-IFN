@@ -472,7 +472,7 @@ class BasicIncremental:
 
         Parameters
         ----------
-        nodes: list
+        nodes: set
             List of the node which need to be remove from the layer.
         layer: HiddenLayer
             The HiddenLayer which contains the nodes.
