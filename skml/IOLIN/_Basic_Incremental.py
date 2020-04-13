@@ -164,7 +164,7 @@ class BasicIncremental:
         should_replace, significant_nodes_indexes = self._check_replacement_of_last_layer(copy_network=copy_network)
 
         if should_replace:
-            # TODO replace last layer with sec_best_att
+            self._replace_last_layer(significant_nodes_indexes=significant_nodes_indexes)
             self._new_split_process(training_window_X=training_window_X,
                                     training_window_y=training_window_y)
 
@@ -184,7 +184,7 @@ class BasicIncremental:
                         self._calculate_conditional_mutual_information_of_current_window(node=node,
                                                                                          index=curr_layer.index)
 
-                    if critical < statistic:
+                    if critical < statistic: # significant
                         continue
                     else:
                         un_significant_nodes_indexes.append(node.index)
@@ -194,9 +194,9 @@ class BasicIncremental:
                                                class_count=self.classifier.class_count)
 
             BasicIncremental.eliminate_nodes(nodes=set(un_significant_nodes_indexes),
-                                             layer=curr_layer.next,
+                                             layer=curr_layer.next_layer,
                                              prev_layer=curr_layer)
-            curr_layer = curr_layer.next
+            curr_layer = curr_layer.next_layer
 
         return copy_network
 
@@ -215,7 +215,6 @@ class BasicIncremental:
                     if curr_layer.is_continuous:
                         Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
                                                      chosen_attribute=curr_layer.index,
-                                                     layer=None,
                                                      partial_X=training_window_X_copy)
 
                     partial_X, partial_y = Utils.drop_records(X=training_window_X_copy,
@@ -232,7 +231,6 @@ class BasicIncremental:
                     if curr_layer.is_continuous:
                         Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
                                                      chosen_attribute=curr_layer.index,
-                                                     layer=None,
                                                      partial_X=X)
 
                     partial_X, partial_y = Utils.drop_records(X=X,
@@ -270,7 +268,7 @@ class BasicIncremental:
         curr_layer = copy_network.root_node.first_layer
 
         while curr_layer.next.next is not None: # loop until last split
-            curr_layer = curr_layer.next
+            curr_layer = curr_layer.next_layer
 
         last_layer_nodes = curr_layer.nodes
 
@@ -302,17 +300,51 @@ class BasicIncremental:
     def _replace_last_layer(self, significant_nodes_indexes):
 
         curr_layer = self.classifier.network.root_node.first_layer
+        is_continuous = self.classifier.sec_att_split_points is not None
+        index_of_sec_best_att = self.classifier.index_of_sec_best_att
 
-        while curr_layer.next.next is not None:  # loop until last split
-            curr_layer = curr_layer.next
+        while curr_layer.next_layer.next_layer is not None:  # loop until last split
+            curr_layer = curr_layer.next_layer
 
+        new_layer_nodes = []
+        terminal_nodes = []
         last_layer_nodes = curr_layer.nodes
+        curr_node_index = max([node.index for node in curr_layer.nodes]) + 1
 
         for node in last_layer_nodes:
             if node.index in significant_nodes_indexes:
-                pass # TODO replace last layer with sec best attribute
-            else:
-                node.is_terminal = True
+                if is_continuous:
+                    Utils.convert_numeric_values(chosen_split_points=self.classifier.sec_att_split_points,
+                                                 chosen_attribute=index_of_sec_best_att,
+                                                 partial_X=node.partial_X)
+
+                unique_values = np.unique(list(node.partial_X[:, index_of_sec_best_att]))
+
+                for i in unique_values: # create nodes for each unique value
+                    attribute_node = Utils.create_attribute_node(partial_X=node.partial_X,
+                                                                 partial_y=node.partial_y,
+                                                                 chosen_attribute_index=index_of_sec_best_att,
+                                                                 attribute_value=i,
+                                                                 curr_node_index=curr_node_index,
+                                                                 prev_node_index=node.index)
+                    new_layer_nodes.append(attribute_node)
+                    curr_node_index += curr_node_index + 1
+
+            terminal_nodes.append(node)
+
+        # create and link the new last layer to the network
+        new_last_layer = HiddenLayer(index_of_sec_best_att)
+        new_last_layer.is_continuous = is_continuous
+
+        if new_last_layer.is_continuous is True:
+            new_last_layer.split_points = self.classifier.sec_att_split_points
+
+        new_last_layer.nodes = new_layer_nodes
+        curr_layer.next_layer = new_last_layer
+
+        # set all the nodes to be terminals
+        self.classifier.set_terminal_nodes(nodes=terminal_nodes,
+                                           class_count=self.classifier.class_count)
 
     def _new_split_process(self, training_window_X, training_window_y):
         pass

@@ -37,6 +37,8 @@ class IfnClassifier():
             self.training_error = 0
             self.cmi_sec_best_att = 0
             self.index_of_sec_best_att = 0
+            self.sec_att_split_points = None
+            self.class_count = None
             self.total_records = 0
             # Number of classes in the target
             self.num_of_classes = 0
@@ -151,7 +153,7 @@ class IfnClassifier():
                                              partial_X=X)
 
             # Create new hidden layer of the maximal mutual information attribute and set the layer nodes
-            un_significant_nodes = []
+            insignificant_nodes = []
             if current_layer is not None:
                 node_index = 0
                 for node in current_layer.get_nodes():
@@ -183,7 +185,7 @@ class IfnClassifier():
                             curr_node_index += 1
                     # If the node isn't significant we will set it as terminal node later
                     else:
-                        un_significant_nodes.append(node)
+                        insignificant_nodes.append(node)
             # First layer
             else:
                 prev_node = 0
@@ -212,8 +214,8 @@ class IfnClassifier():
                 next_layer.split_points = chosen_split_points
 
             # Set the un significant node as terminal nodes
-            un_significant_nodes_set = list(set(un_significant_nodes))
-            self.set_terminal_nodes(un_significant_nodes_set, self.class_count)
+            insignificant_nodes_set = list(set(insignificant_nodes))
+            self.set_terminal_nodes(insignificant_nodes_set, self.class_count)
 
             current_layer = next_layer
             number_of_layers += 1
@@ -249,6 +251,9 @@ class IfnClassifier():
         self.training_error = self.calculate_error_rate(X=X, y=y)
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
             self.calculate_second_best_attribute_of_last_layer(attributes_mi=attributes_mi)
+
+        if 'category' not in columns_type[self.index_of_sec_best_att]:
+            self.sec_att_split_points = self.split_points[self.index_of_sec_best_att]
 
         return self
 

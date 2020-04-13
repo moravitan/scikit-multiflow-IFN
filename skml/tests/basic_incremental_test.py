@@ -5,6 +5,7 @@ from skml.IOLIN._Basic_Incremental import BasicIncremental
 
 network = IfnNetwork()
 
+
 def _setup_eliminate_nodes_test_env():
     network.build_target_layer([0, 1])
 
@@ -96,7 +97,6 @@ def _setup_eliminate_nodes_test_env():
                           partial_y=None,
                           is_terminal=True)
 
-
     third_layer.nodes = [node1, node2, node3, node4]
     second_layer.next_layer = third_layer
     return network
@@ -145,18 +145,6 @@ def test_eliminate_some_nodes_in_layer():
     assert np.array_equal(nodes_to_remains, third_layer_nodes)
 
 
-test_eliminate_all_nodes_in_layer()
-test_eliminate_some_nodes_in_layer()
-
-
-def test():
-    networkt = copy.copy(network)
-    networkt.root_node = None
-    print(network.root_node)
-    print(networkt.root_node)
-
-
-test()
-
-
-
+# test_eliminate_all_nodes_in_layer()
+# test_eliminate_some_nodes_in_layer()
+_setup_eliminate_nodes_test_env()
