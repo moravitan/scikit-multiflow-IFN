@@ -1,5 +1,10 @@
 import numpy as np
 import copy
+
+from sklearn.utils import check_X_y
+
+from skml import IfnClassifier
+from skml._dataProcessing import DataProcessor
 from skml._ifn_network import IfnNetwork, HiddenLayer, AttributeNode
 from skml.IOLIN._Basic_Incremental import BasicIncremental
 
@@ -110,7 +115,7 @@ def test_eliminate_all_nodes_in_layer():
         if node.index == 3 or node.index == 5:
             nodes_to_remove.append(node.index)
 
-    BasicIncremental.eliminate_nodes(nodes=nodes_to_remove,
+    BasicIncremental.eliminate_nodes(nodes=set(nodes_to_remove),
                                      layer=network.root_node.first_layer.next_layer.next_layer,
                                      prev_layer=network.root_node.first_layer.next_layer)
 
@@ -133,7 +138,7 @@ def test_eliminate_some_nodes_in_layer():
         if node.index == 9 or node.index == 10:
             nodes_to_remains.append(node)
 
-    BasicIncremental.eliminate_nodes(nodes=parents_nodes_to_remove,
+    BasicIncremental.eliminate_nodes(nodes=set(parents_nodes_to_remove),
                                      layer=network.root_node.first_layer.next_layer.next_layer,
                                      prev_layer=network.root_node.first_layer.next_layer)
 
@@ -145,6 +150,22 @@ def test_eliminate_some_nodes_in_layer():
     assert np.array_equal(nodes_to_remains, third_layer_nodes)
 
 
-# test_eliminate_all_nodes_in_layer()
-# test_eliminate_some_nodes_in_layer()
-_setup_eliminate_nodes_test_env()
+def test_clone_network():
+    _setup_eliminate_nodes_test_env()
+    dp = DataProcessor()
+    x_train, x_test, y_train, y_test = dp.convert(csv_file_path="datasets/credit.csv",
+                                                  test_size=0.3)
+
+    x_train, y_train = check_X_y(x_train, y_train, accept_sparse=True)
+
+    copy_network = BasicIncremental.clone_network(network=network,
+                                                  training_window_X=x_train,
+                                                  training_window_y=y_train)
+
+    assert copy_network.root_node.first_layer.index == 1
+    assert len(copy_network.root_node.first_layer.next_layer.nodes) == 4
+
+
+test_eliminate_all_nodes_in_layer()
+test_eliminate_some_nodes_in_layer()
+test_clone_network()

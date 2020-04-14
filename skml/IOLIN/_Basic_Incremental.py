@@ -199,8 +199,9 @@ class BasicIncremental:
 
         """
 
-        copy_network = self._clone_network(training_window_X=training_window_X,
-                                           training_window_y=training_window_y)
+        copy_network = BasicIncremental.clone_network(network=self.classifier.network,
+                                                      training_window_X=training_window_X,
+                                                      training_window_y=training_window_y)
 
         curr_layer = copy_network.root_node.first_layer
         curr_layer_in_original_network = self.classifier.network.root_node.first_layer
@@ -231,63 +232,6 @@ class BasicIncremental:
 
         return copy_network
 
-    def _clone_network(self, training_window_X, training_window_y):
-        """ This method copy the IfnNetwork from the classifier field and replace the training samples inside the
-            nodes with the given training samples as parameters.
-
-        Parameters
-        ----------
-        training_window_X: {array-like, sparse matrix}, shape (n_samples, n_features)
-            The training input samples of the new window.
-        training_window_y: array-like, shape = [n_samples]
-            The target values of the new samples in the new window.
-
-        Returns
-        -------
-            The copy network of the classifier field.
-
-        """
-
-        copy_network = copy.copy(self.classifier.network)
-        training_window_X_copy = training_window_X.copy()
-        training_window_y_copy = training_window_y.copy()
-
-        curr_layer = copy_network.root_node.first_layer
-        is_first_layer = True
-        nodes_data = {}
-        while curr_layer is not None:
-            for node in curr_layer.nodes:
-                if is_first_layer:
-                    if curr_layer.is_continuous:
-                        Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
-                                                     chosen_attribute=curr_layer.index,
-                                                     partial_X=training_window_X_copy)
-
-                    partial_X, partial_y = Utils.drop_records(X=training_window_X_copy,
-                                                              y=training_window_y_copy,
-                                                              attribute_index=curr_layer.index,
-                                                              value=node.inner_index)
-                    node.partial_X = partial_X
-                    node.partial_y = partial_y
-                    nodes_data[node.index] = [partial_X, partial_y]
-
-                else:
-                    X = nodes_data[node.prev_node][0]
-                    y = nodes_data[node.prev_node][1]
-                    if curr_layer.is_continuous:
-                        Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
-                                                     chosen_attribute=curr_layer.index,
-                                                     partial_X=X)
-
-                    partial_X, partial_y = Utils.drop_records(X=X,
-                                                              y=y,
-                                                              attribute_index=curr_layer.index,
-                                                              value=node.inner_index)
-                    node.partial_X = partial_X
-                    node.partial_y = partial_y
-                    nodes_data[node.index] = [partial_X, partial_y]
-
-        return copy_network
 
     def _check_replacement_of_last_layer(self, copy_network):
         """ This method, according to "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X"
@@ -498,6 +442,67 @@ class BasicIncremental:
         if len(layer.nodes) == 0:
             prev_layer.next_layer = layer.next_layer
 
-        BasicIncremental.eliminate_nodes(nodes=next_layer_nodes,
+        BasicIncremental.eliminate_nodes(nodes=set(next_layer_nodes),
                                          layer=layer.next_layer,
                                          prev_layer=layer)
+
+    @staticmethod
+    def clone_network(network, training_window_X, training_window_y):
+        """ This method copy the IfnNetwork from the classifier field and replace the training samples inside the
+            nodes with the given training samples as parameters.
+
+        Parameters
+        ----------
+        training_window_X: {array-like, sparse matrix}, shape (n_samples, n_features)
+            The training input samples of the new window.
+        training_window_y: array-like, shape = [n_samples]
+            The target values of the new samples in the new window.
+
+        Returns
+        -------
+            The copy network of the classifier field.
+
+        """
+
+        copy_network = copy.copy(network)
+        training_window_X_copy = training_window_X.copy()
+        training_window_y_copy = training_window_y.copy()
+
+        curr_layer = copy_network.root_node.first_layer
+        is_first_layer = True
+        nodes_data = {}
+        while curr_layer is not None:
+            for node in curr_layer.nodes:
+                if is_first_layer:
+                    if curr_layer.is_continuous:
+                        Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
+                                                     chosen_attribute=curr_layer.index,
+                                                     partial_X=training_window_X_copy)
+
+                    partial_X, partial_y = Utils.drop_records(X=training_window_X_copy,
+                                                              y=training_window_y_copy,
+                                                              attribute_index=curr_layer.index,
+                                                              value=node.attribute_value)
+                    node.partial_X = partial_X
+                    node.partial_y = partial_y
+                    nodes_data[node.index] = [partial_X, partial_y]
+
+                else:
+                    X = nodes_data[node.prev_node][0]
+                    y = nodes_data[node.prev_node][1]
+                    if curr_layer.is_continuous:
+                        Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
+                                                     chosen_attribute=curr_layer.index,
+                                                     partial_X=X)
+
+                    partial_X, partial_y = Utils.drop_records(X=X,
+                                                              y=y,
+                                                              attribute_index=curr_layer.index,
+                                                              value=node.attribute_value)
+                    node.partial_X = partial_X
+                    node.partial_y = partial_y
+                    nodes_data[node.index] = [partial_X, partial_y]
+
+            curr_layer = curr_layer.next_layer
+
+        return copy_network
