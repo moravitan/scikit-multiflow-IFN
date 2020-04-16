@@ -1,6 +1,6 @@
 import os
 import shutil
-from skml import PureMultiple
+from skml.IOLIN import PureMultiple
 from skml import IfnClassifier
 
 
