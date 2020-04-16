@@ -1,9 +1,14 @@
 
-from ._ifnClassifier import IfnClassifier
-from ._MetaLearning import MetaLearning
-from ._OLIN import OnlineNetwork
-from ._pure_multiple_model_IOLIN import PureMultiple
+from .ifn_Classifier import IfnClassifier
+from .IOLIN.Meta_Learning import MetaLearning
+from .IOLIN.OLIN import OnlineNetwork
+from .IOLIN.Regenerative import OnlineNetworkRegenerative
+from .IOLIN.Basic_Incremental import BasicIncremental
+from .IOLIN.pure_multiple_model import PureMultiple
+
 from ._version import __version__
 
-__all__ = ['_ifnClassifier', '_MetaLearning', 'OnlineNetwork', 'PureMultiple',
+__all__ = ['IfnClassifier', 'OnlineNetwork', 'MetaLearning', 'OnlineNetworkRegenerative', 'BasicIncremental',
+           'PureMultiple',
            '__version__']
+

@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 from skml import IfnClassifier
-from skml import MetaLearning
+from skml.IOLIN import MetaLearning
 from skmultiflow.data import SEAGenerator
 
 
