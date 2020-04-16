@@ -118,16 +118,16 @@ class IfnClassifier():
             chosen_split_points = []
             if current_layer is not None:
                 global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
-                    self._choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                 columns_type=columns_type,
-                                                 nodes=current_layer.get_nodes())
+                    self.choose_split_attribute(attributes_indexes=attributes_indexes,
+                                                columns_type=columns_type,
+                                                nodes=current_layer.get_nodes())
             # first layer
             else:
                 global_chosen_attribute, attributes_mi, not_relevant = \
-                    self._choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                 columns_type=columns_type,
-                                                 X=X,
-                                                 y=y)
+                    self.choose_split_attribute(attributes_indexes=attributes_indexes,
+                                                columns_type=columns_type,
+                                                X=X,
+                                                y=y)
 
             # there isn't an attribute to split the network by
             if global_chosen_attribute == -1:
@@ -138,6 +138,10 @@ class IfnClassifier():
                                             attributes_cmi=attributes_mi,
                                             chosen_attribute_index=global_chosen_attribute,
                                             chosen_attribute=cols[global_chosen_attribute])
+
+                self.split_points.clear()
+                self.nodes_splitted_per_attribute.clear()
+                significant_attributes_per_node.clear()
 
                 break
 
@@ -356,7 +360,7 @@ class IfnClassifier():
 
         return np.array(predicted)
 
-    def _choose_split_attribute(self, attributes_indexes, columns_type, nodes=None, X=None, y=None):
+    def choose_split_attribute(self, attributes_indexes, columns_type, nodes=None, X=None, y=None):
         """ Returns the most significant attribute upon all.
             The mose significant attribute is the one hold the higher conditional mutual information.
 

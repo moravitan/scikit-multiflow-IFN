@@ -11,8 +11,6 @@ import skml.Utils as Utils
 from skml._ifn_network import HiddenLayer
 
 
-
-
 class OnlineNetwork(ABC):
 
     def __init__(self,
@@ -81,7 +79,6 @@ class OnlineNetwork(ABC):
         self.meta_learning = MetaLearning(alpha, number_of_classes)
         self.data_stream_generator = data_stream_generator
         self.data_stream_generator.prepare_for_use()
-
 
     @property
     def classifier(self):
@@ -328,13 +325,13 @@ class OnlineNetwork(ABC):
         self.classifier.set_terminal_nodes(nodes=terminal_nodes,
                                            class_count=self.classifier.class_count)
 
-    def _new_split_process(self, training_window_X, training_window_y):
+    def _new_split_process(self, training_window_X):
 
         curr_layer = self.classifier.network.root_node.first_layer
         last_layer = None
         chosen_attributes = []
 
-        while curr_layer is not None:
+        while curr_layer is not None:  # collect of the chosen attributes of the splitting points in the network.
             chosen_attributes.append(curr_layer.index)
             if curr_layer.next_layer is None:
                 last_layer = curr_layer
@@ -343,10 +340,64 @@ class OnlineNetwork(ABC):
         chosen_attributes = set(chosen_attributes)
         attributes_indexes = list(range(0, len(training_window_X[0])))
 
-        remaining_attributes = np.setdiff1d(attributes_indexes,chosen_attributes,assume_unique=False).tolist()
+        columns_type = Utils.get_columns_type(training_window_X)
 
-        for i in remaining_attributes:
-            pass
+        remaining_attributes = np.setdiff1d(attributes_indexes, chosen_attributes, assume_unique=False).tolist()
+
+        global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
+            self.classifier.choose_split_attribute(attributes_indexes=remaining_attributes,
+                                                   columns_type=columns_type,
+                                                   nodes=last_layer.get_nodes())
+
+        curr_node_index = max([node.index for node in last_layer.nodes]) + 1
+        nodes_list = []
+        terminal_nodes = []
+        if global_chosen_attribute != -1:
+            is_continuous = 'category' not in columns_type[global_chosen_attribute]
+            node_index = 0
+            for node in last_layer.get_nodes():
+                if is_continuous:
+                    if node in set(self.classifier.nodes_splitted_per_attribute[global_chosen_attribute]):
+                        attributes_mi_per_node = 1
+                    else:
+                        attributes_mi_per_node = 0
+                else:
+                    attributes_mi_per_node = significant_attributes_per_node[global_chosen_attribute][node_index]
+                node_index += 1
+
+                if attributes_mi_per_node > 0:
+                    if is_continuous:
+                        Utils.convert_numeric_values(
+                            chosen_split_points=self.classifier.split_points[global_chosen_attribute],
+                            chosen_attribute=global_chosen_attribute,
+                            partial_X=node.partial_X)
+                    partial_X = node.partial_x
+                    partial_y = node.partial_y
+                    attribute_data_in_node = list(partial_X[:, global_chosen_attribute])
+                    unique_values = np.unique(attribute_data_in_node)
+                    prev_node = node.index
+                    for i in unique_values:
+                        attribute_node = Utils.create_attribute_node(partial_X=partial_X,
+                                                                     partial_y=partial_y,
+                                                                     chosen_attribute_index=global_chosen_attribute,
+                                                                     attribute_value=i,
+                                                                     curr_node_index=curr_node_index,
+                                                                     prev_node_index=prev_node)
+                        nodes_list.append(attribute_node)
+                        terminal_nodes.append(attribute_node)
+                        curr_node_index += 1
+                else:
+                    terminal_nodes.append(node)
+
+            new_layer = HiddenLayer(global_chosen_attribute)
+            last_layer.next_layer = new_layer
+            new_layer.nodes = nodes_list
+            if is_continuous:
+                new_layer.is_continuous = True
+                new_layer.split_points = self.classifier.split_points[global_chosen_attribute]
+
+            self.classifier.set_terminal_nodes(nodes=terminal_nodes,
+                                               class_count=self.classifier.class_count)
 
     def _induce_new_model(self, training_window_X, training_window_y):
         """ This method create a new network by calling fit method of IfnClassifier based on the training_window_X and
@@ -394,8 +445,8 @@ class OnlineNetwork(ABC):
             prev_layer.next_layer = layer.next_layer
 
         OnlineNetwork.eliminate_nodes(nodes=set(next_layer_nodes),
-                                         layer=layer.next_layer,
-                                         prev_layer=layer)
+                                      layer=layer.next_layer,
+                                      prev_layer=layer)
 
     @staticmethod
     def clone_network(network, training_window_X, training_window_y):
