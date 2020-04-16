@@ -110,8 +110,7 @@ class OnlineNetwork(ABC):
 
         if should_replace:
             self._replace_last_layer(significant_nodes_indexes=significant_nodes_indexes)
-            self._new_split_process(training_window_X=training_window_X,
-                                    training_window_y=training_window_y)
+            self._new_split_process(training_window_X=training_window_X)
 
     def _check_split_validation(self, training_window_X, training_window_y):
         """ This method, according to "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X"
