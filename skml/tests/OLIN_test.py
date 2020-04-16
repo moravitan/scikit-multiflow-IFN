@@ -4,7 +4,7 @@ from sklearn.utils import check_X_y
 
 from skml._dataProcessing import DataProcessor
 from skml._ifn_network import IfnNetwork, HiddenLayer, AttributeNode
-from skml.IOLIN._Basic_Incremental import BasicIncremental
+from skml.IOLIN.Basic_Incremental import BasicIncremental
 
 network = IfnNetwork()
 
@@ -162,6 +162,7 @@ def test_clone_network():
 
     assert copy_network.root_node.first_layer.index == 1
     assert len(copy_network.root_node.first_layer.next_layer.nodes) == 4
+
 
 
 test_eliminate_all_nodes_in_layer()

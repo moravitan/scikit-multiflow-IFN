@@ -3,29 +3,16 @@ import pickle
 
 import numpy as np
 import pandas as pd
+from skml.IOLIN import OnlineNetwork
 from skml import IfnClassifier
-from skml.IOLIN import MetaLearning
 from skmultiflow.data import SEAGenerator
 
 
-class OnlineNetworkRegenerative:
+class OnlineNetworkRegenerative(OnlineNetwork):
 
-
-    def __init__(self,
-                 classifier:IfnClassifier,
-                 path,
-                 number_of_classes=2,
-                 n_min=378,
-                 n_max=math.inf,
-                 alpha=0.99,
-                 Pe=0.5,
-                 init_add_count=10,
-                 inc_add_count=50,
-                 max_add_count=100,
-                 red_add_count=75,
-                 min_add_count=1,
-                 max_window=1000,
-                 data_stream_generator=SEAGenerator()):
+    def __init__(self, classifier: IfnClassifier, path, number_of_classes=2, n_min=378, n_max=math.inf, alpha=0.99,
+                 Pe=0.5, init_add_count=10, inc_add_count=50, max_add_count=100, red_add_count=75, min_add_count=1,
+                 max_window=1000, data_stream_generator=SEAGenerator()):
 
         """
         Parameters
@@ -60,22 +47,8 @@ class OnlineNetworkRegenerative:
             Stream generator for the stream data
         """
 
-        self.classifier = classifier
-        self.path = path
-        self.n_min = n_min
-        self.n_max = n_max
-        self.Pe = Pe
-        self.init_add_count = init_add_count
-        self.inc_add_count = inc_add_count
-        self.max_add_count = max_add_count
-        self.red_add_count = red_add_count
-        self.min_add_count = min_add_count
-        self.max_window = max_window
-        self.window = None
-        self.meta_learning = MetaLearning(alpha, number_of_classes)
-        self.data_stream_generator = data_stream_generator
-        self.data_stream_generator.prepare_for_use()
-        self.counter = 1
+        super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
+                         max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
     def regenerate(self):
         """ This function is an implementation to the regenerative algorithm as represented
@@ -141,7 +114,7 @@ class OnlineNetworkRegenerative:
                 unique, counts = np.unique(np.array(y_batch), return_counts=True)
                 target_distribution = counts[0] / len(y_batch)
                 NI = len(self.classifier.network.root_node.first_layer.nodes)
-                self.window = self.meta_learning.calculate_new_window(NI,target_distribution,Etr)
+                self.window = self.meta_learning.calculate_new_window(NI, target_distribution, Etr)
                 i = j - self.window
                 add_count = max(add_count * (1 - (self.red_add_count / 100)), self.min_add_count)
 

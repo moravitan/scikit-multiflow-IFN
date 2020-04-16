@@ -5,6 +5,7 @@ from scipy import stats
 import copy
 from abc import ABC
 from skmultiflow.data import SEAGenerator
+from sklearn.utils.validation import check_X_y
 from skml import IfnClassifier
 from skml.IOLIN import MetaLearning
 import skml.Utils as Utils
@@ -79,6 +80,7 @@ class OnlineNetwork(ABC):
         self.meta_learning = MetaLearning(alpha, number_of_classes)
         self.data_stream_generator = data_stream_generator
         self.data_stream_generator.prepare_for_use()
+        self.counter = 1
 
     @property
     def classifier(self):
@@ -188,7 +190,7 @@ class OnlineNetwork(ABC):
         index_of_second_best_att = self.classifier.index_of_sec_best_att
 
         if index_of_second_best_att == -1:  # There's only one significant attribute
-            return should_replace
+            return should_replace, None
 
         conditional_mutual_information_second_best_att, significant_nodes_indexes = \
             self._calculate_cmi_of_sec_best_attribute(copy_network=copy_network,
@@ -221,8 +223,10 @@ class OnlineNetwork(ABC):
         significant_nodes_indexes = []
         curr_layer = copy_network.root_node.first_layer
 
-        while curr_layer.next.next is not None:  # loop until last split
+        while curr_layer.next_layer.next_layer is not None:  # loop until last split
             curr_layer = curr_layer.next_layer
+            if curr_layer.next_layer is None:
+                break
 
         last_layer_nodes = curr_layer.nodes
 
@@ -253,7 +257,7 @@ class OnlineNetwork(ABC):
             The critical and the calculated mutual information.
         """
 
-        X = node.partial_X
+        X = node.partial_x
         y = node.partial_y
         attribute_data = list(X[:, index])
         unique_values = np.unique(attribute_data)
@@ -409,7 +413,8 @@ class OnlineNetwork(ABC):
         training_window_y: array-like, shape = [n_samples]
             The target values of the new samples in the new window.
         """
-        self.classifier = self.classifier.fit(training_window_X, training_window_y)
+        training_window_X_df = pd.DataFrame(training_window_X)
+        self.classifier = self.classifier.fit(training_window_X_df, training_window_y)
 
     @staticmethod
     def eliminate_nodes(nodes, layer, prev_layer):
@@ -469,6 +474,10 @@ class OnlineNetwork(ABC):
         training_window_X_copy = training_window_X.copy()
         training_window_y_copy = training_window_y.copy()
 
+        training_window_X_copy, training_window_y_copy = \
+            check_X_y(training_window_X_copy, training_window_y_copy, accept_sparse=True)
+
+
         curr_layer = copy_network.root_node.first_layer
         is_first_layer = True
         nodes_data = {}
@@ -484,7 +493,7 @@ class OnlineNetwork(ABC):
                                                               y=training_window_y_copy,
                                                               attribute_index=curr_layer.index,
                                                               value=node.attribute_value)
-                    node.partial_X = partial_X
+                    node.partial_x = partial_X
                     node.partial_y = partial_y
                     nodes_data[node.index] = [partial_X, partial_y]
 
@@ -500,7 +509,7 @@ class OnlineNetwork(ABC):
                                                               y=y,
                                                               attribute_index=curr_layer.index,
                                                               value=node.attribute_value)
-                    node.partial_X = partial_X
+                    node.partial_x = partial_X
                     node.partial_y = partial_y
                     nodes_data[node.index] = [partial_X, partial_y]
 

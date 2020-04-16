@@ -96,6 +96,7 @@ class IfnClassifier():
         curr_node_index = 1
         current_layer = None
         attributes_mi = {}
+        last_layer_mi = {}
 
         self.network.build_target_layer(unique)
 
@@ -138,10 +139,6 @@ class IfnClassifier():
                                             attributes_cmi=attributes_mi,
                                             chosen_attribute_index=global_chosen_attribute,
                                             chosen_attribute=cols[global_chosen_attribute])
-
-                self.split_points.clear()
-                self.nodes_splitted_per_attribute.clear()
-                significant_attributes_per_node.clear()
 
                 break
 
@@ -231,6 +228,7 @@ class IfnClassifier():
 
             # overrides the value until the last iteration
             self.last_layer_mi = attributes_mi[global_chosen_attribute]
+            last_layer_mi = attributes_mi.copy()
             layer = 'next'
 
             attributes_indexes.remove(global_chosen_attribute)
@@ -254,10 +252,14 @@ class IfnClassifier():
 
         self.training_error = self.calculate_error_rate(X=X, y=y)
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
-            self.calculate_second_best_attribute_of_last_layer(attributes_mi=attributes_mi)
+            self.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
 
-        if 'category' not in columns_type[self.index_of_sec_best_att]:
+        if self.index_of_sec_best_att != -1 and 'category' not in columns_type[self.index_of_sec_best_att]:
             self.sec_att_split_points = self.split_points[self.index_of_sec_best_att]
+
+        self.split_points.clear()
+        self.nodes_splitted_per_attribute.clear()
+        significant_attributes_per_node.clear()
 
         return self
 
@@ -275,7 +277,7 @@ class IfnClassifier():
             Returns an array of ones.
         """
         X = check_array(X, accept_sparse=True)
-        check_is_fitted(self, 'is_fitted_')
+        check_is_fitted(self, 'is_fitted')
         predicted = []
         for record in X:
             curr_layer = self.network.root_node.first_layer
@@ -900,6 +902,8 @@ class IfnClassifier():
                                                                      class_count=class_count))
 
     def calculate_error_rate(self, X, y):
+
+        X = check_array(X, accept_sparse=True)
         correct = 0
         for i in range(len(y)):
             predicted_value = self.predict([X[i]])[0]
@@ -925,15 +929,17 @@ class IfnClassifier():
         """
 
         attributes_mi_copy = attributes_mi.copy()
+        attributes_mi_copy = attributes_mi.copy()
 
         index_of_max_cmi = max(attributes_mi_copy, key=attributes_mi.get)
         attributes_mi_copy.pop(index_of_max_cmi)
         index_of_second_best = max(attributes_mi_copy, key=attributes_mi.get)
+        sec_best_att_cmi = attributes_mi_copy[index_of_second_best]
 
         if attributes_mi_copy[index_of_second_best] == 0:
             index_of_second_best = -1
 
-        return index_of_second_best
+        return index_of_second_best, sec_best_att_cmi
 
 
 

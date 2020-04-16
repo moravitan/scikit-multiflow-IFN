@@ -1,10 +1,12 @@
 import math
+import pickle
+
 import pandas as pd
 
 from skmultiflow.data import SEAGenerator
 from skml import IfnClassifier
 
-from skml.IOLIN._OLIN import OnlineNetwork
+from skml.IOLIN.OLIN import OnlineNetwork
 
 
 class BasicIncremental(OnlineNetwork):
@@ -16,8 +18,6 @@ class BasicIncremental(OnlineNetwork):
         super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
                          max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
-
-
     def IN_controll(self):
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
@@ -27,18 +27,6 @@ class BasicIncremental(OnlineNetwork):
         X_batch = []
         y_batch = []
 
-        while i < j:
-            X, y = self.data_stream_generator.next_sample()
-            X_batch.append(X[0])
-            y_batch.append(y[0])
-            i = i + 1
-
-        X_batch_df = pd.DataFrame(X_batch)
-        self.classifier.fit(X_batch_df, y_batch)
-        j = j + self.window
-        X_batch.clear()
-        y_batch.clear()
-
         while j < self.n_max:
 
             while i < j:
@@ -47,27 +35,42 @@ class BasicIncremental(OnlineNetwork):
                 y_batch.append(y[0])
                 i = i + 1
 
-            k = j + add_count
-            X_validation_samples = []
-            y_validation_samples = []
+            if self.classifier.is_fitted: # the network already fitted at least one time before
 
-            while j < k:
-                X_validation, y_validation = self.data_stream_generator.next_sample()
-                X_validation_samples.append(X_validation[0])
-                y_validation_samples.append(y_validation[0])
-                j = j + 1
+                k = j + add_count
+                X_validation_samples = []
+                y_validation_samples = []
 
-            j = k
+                while j < k:
+                    X_validation, y_validation = self.data_stream_generator.next_sample()
+                    X_validation_samples.append(X_validation[0])
+                    y_validation_samples.append(y_validation[0])
+                    j = j + 1
 
-            self.incremental_IN(X_batch, y_batch, X_validation_samples, y_validation_samples, add_count)
-            i = j - self.window
+                j = k
+                # X_batch_df = pd.DataFrame(X_batch)
+                self._incremental_IN(X_batch, y_batch, X_validation_samples, y_validation_samples, add_count)
+                i = j - self.window
 
-    def incremental_IN(self,
-                       training_window_X,
-                       training_window_y,
-                       validation_window_X,
-                       validation_window_y,
-                       add_count):
+            else:  # cold start
+                X_batch_df = pd.DataFrame(X_batch)
+                self.classifier.fit(X_batch_df, y_batch)
+                j = j + self.window
+                # save the model
+                path = self.path + "/" + str(self.counter)
+                pickle.dump(self.classifier, open(path, "wb"))
+                self.counter = self.counter + 1
+
+
+            X_batch.clear()
+            y_batch.clear()
+
+    def _incremental_IN(self,
+                        training_window_X,
+                        training_window_y,
+                        validation_window_X,
+                        validation_window_y,
+                        add_count):
 
         Etr = self.classifier.calculate_error_rate(X=training_window_X,
                                                    y=training_window_y)
