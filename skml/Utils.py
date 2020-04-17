@@ -148,7 +148,6 @@ def write_details_to_file(layer_position, attributes_cmi, chosen_attribute_index
 
         if chosen_attribute_index != -1:
             f.write('\nChosen attribute is: ' + chosen_attribute + "(" + str(chosen_attribute_index) + ")" + '\n\n')
-            # f.write('\nSplit points are: ' + str(split_points[chosen_attribute]) + '\n\n')
         else:
             f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute_index) + ")" + '\n\n')
         f.close()
@@ -183,6 +182,7 @@ def drop_records(X, y, attribute_index, value):
         if X[i][attribute_index] == value:
             new_x.append(X[i])
             new_y.append(y[i])
+
     return np.array(new_x), np.array(new_y)
 
 
@@ -249,6 +249,7 @@ def get_columns_type(X):
             columns_type.append(str(X[dt].dtype))
         else:
             columns_type.append("category")
+
     return columns_type
 
 
@@ -277,3 +278,30 @@ def convert_numeric_values(chosen_split_points, chosen_attribute, partial_X):
     for record in partial_X:
         record[chosen_attribute] = find_split_position(value=record[chosen_attribute],
                                                        positions=chosen_split_points)
+
+
+def calculate_second_best_attribute_of_last_layer(attributes_mi:dict):
+    """ This function finds and return the attribute index of the second best conditional mutual information
+        based on the given dictionary.
+
+    Parameters
+    ----------
+    attributes_mi: dict
+        dictionary represent the conditional mutual information of each attribute.
+
+    Returns
+    -------
+        The attribute index of the second best conditional mutual information
+    """
+
+    attributes_mi_copy = attributes_mi.copy()
+
+    index_of_max_cmi = max(attributes_mi_copy, key=attributes_mi.get)
+    attributes_mi_copy.pop(index_of_max_cmi)
+    index_of_second_best = max(attributes_mi_copy, key=attributes_mi.get)
+    sec_best_att_cmi = attributes_mi_copy[index_of_second_best]
+
+    if attributes_mi_copy[index_of_second_best] == 0:
+        index_of_second_best = -1
+
+    return index_of_second_best, sec_best_att_cmi
