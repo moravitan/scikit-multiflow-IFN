@@ -4,7 +4,7 @@ Original code and method by: Prof' Mark Last
 License: BSD 3 clause
 """
 import numpy as np
-from ._ifn_network import IfnNetwork, AttributeNode, HiddenLayer
+from ._ifn_network import IfnNetwork, HiddenLayer
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from scipy import stats
 import math
@@ -95,7 +95,6 @@ class IfnClassifier():
         number_of_layers = 0
         curr_node_index = 1
         current_layer = None
-        attributes_mi = {}
         last_layer_mi = {}
 
         self.network.build_target_layer(unique)
@@ -252,7 +251,7 @@ class IfnClassifier():
 
         self.training_error = self.calculate_error_rate(X=X, y=y)
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
-            self.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
+            Utils.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
 
         if self.index_of_sec_best_att != -1 and 'category' not in columns_type[self.index_of_sec_best_att]:
             self.sec_att_split_points = self.split_points[self.index_of_sec_best_att]
@@ -907,39 +906,8 @@ class IfnClassifier():
         correct = 0
         for i in range(len(y)):
             predicted_value = self.predict([X[i]])[0]
-            # predicted_value = self.predict(X.iloc[[i]])[0]
             if predicted_value == y[i]:
                 correct += 1
 
         error_rate = (len(y) - correct) / len(y)
         return error_rate
-
-    def calculate_second_best_attribute_of_last_layer(self, attributes_mi:dict):
-        """ This function finds and return the attribute index of the second best conditional mutual information
-            based on the given dictionary.
-
-        Parameters
-        ----------
-        attributes_mi: dict
-            dictionary represent the conditional mutual information of each attribute.
-
-        Returns
-        -------
-            The attribute index of the second best conditional mutual information
-        """
-
-        attributes_mi_copy = attributes_mi.copy()
-        attributes_mi_copy = attributes_mi.copy()
-
-        index_of_max_cmi = max(attributes_mi_copy, key=attributes_mi.get)
-        attributes_mi_copy.pop(index_of_max_cmi)
-        index_of_second_best = max(attributes_mi_copy, key=attributes_mi.get)
-        sec_best_att_cmi = attributes_mi_copy[index_of_second_best]
-
-        if attributes_mi_copy[index_of_second_best] == 0:
-            index_of_second_best = -1
-
-        return index_of_second_best, sec_best_att_cmi
-
-
-
