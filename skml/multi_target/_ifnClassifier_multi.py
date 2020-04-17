@@ -283,7 +283,8 @@ class IfnClassifier():
         self.is_fitted = True
         print("Done. Network is fitted")
 
-        self.training_error = self.calculate_error_rate(X=X, y=y)
+        # TODO remove from comment after fixing the function
+        # self.training_error = self.calculate_error_rate(X=X, y=y)
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
             Utils.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
 
