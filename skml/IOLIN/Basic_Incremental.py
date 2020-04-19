@@ -48,7 +48,6 @@ class BasicIncremental(OnlineNetwork):
                     j = j + 1
 
                 j = k
-                # X_batch_df = pd.DataFrame(X_batch)
                 self._incremental_IN(X_batch, y_batch, X_validation_samples, y_validation_samples, add_count)
                 i = j - self.window
 
