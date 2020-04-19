@@ -3,8 +3,10 @@ import pickle
 import os
 import numpy as np
 import pandas as pd
+from scipy import stats
+
 from skml import IfnClassifier
-from skml.IOLIN import MetaLearning, OnlineNetwork
+from skml.IOLIN import OnlineNetwork
 from skmultiflow.data import SEAGenerator
 
 
@@ -106,7 +108,9 @@ class MultipleModel(OnlineNetwork):
             else:
 
                 unique, counts = np.unique(np.array(y_batch), return_counts=True)
-                E_current = counts[0] / len(y_batch)  # Entropy of target attribute on the current window
+                target_distribution_current = counts[0] / len(y_batch)
+                # Entropy of target attribute on the current window
+                E_current = stats.entropy([target_distribution_current, 1 - target_distribution_current], base=2)
 
                 classifier_files_names = os.listdir(self.path)
                 generated_classifiers = {}
@@ -114,7 +118,8 @@ class MultipleModel(OnlineNetwork):
                 for classifier in classifier_files_names:
                     generated_clf = pickle.load(open(self.path + "/" + classifier, "rb"))
                     # Entropy of target attribute on a former window
-                    E_former = generated_clf.class_count[0] / len(y_batch)
+                    target_distribution_former = generated_clf.class_count[0] / len(y_batch)
+                    E_former = stats.entropy([target_distribution_former, 1 - target_distribution_former], base=2)
                     generated_classifiers[classifier] = abs(E_current - E_former)
 
                 # Choose network with min |E_current(T)–E_former(T)|
