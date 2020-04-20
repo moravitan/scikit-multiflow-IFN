@@ -93,7 +93,9 @@ class PureMultiple(OnlineNetwork):
                 y_validation_samples = []
 
                 while j < k:
-                    X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
+                    X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
+                    X_validation_samples.append(X_validation_sample[0])
+                    y_validation_samples.append(y_validation_sample[0])
                     j = j + 1
 
                 Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
@@ -114,6 +116,8 @@ class PureMultiple(OnlineNetwork):
                 counter = counter + 1
 
             j = j + self.window
+            X_batch.clear()
+            y_batch.clear()
 
         last_model = pickle.load(open(self.path + "/" + str(counter - 1) + ".pickle", "rb"))
         return last_model

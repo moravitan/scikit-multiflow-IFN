@@ -42,9 +42,9 @@ class BasicIncremental(OnlineNetwork):
                 y_validation_samples = []
 
                 while j < k:
-                    X_validation, y_validation = self.data_stream_generator.next_sample()
-                    X_validation_samples.append(X_validation[0])
-                    y_validation_samples.append(y_validation[0])
+                    X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
+                    X_validation_samples.append(X_validation_sample[0])
+                    y_validation_samples.append(y_validation_sample[0])
                     j = j + 1
 
                 j = k
@@ -60,7 +60,7 @@ class BasicIncremental(OnlineNetwork):
                 pickle.dump(self.classifier, open(path, "wb"))
                 self.counter = self.counter + 1
 
-
+            j = j + self.window
             X_batch.clear()
             y_batch.clear()
 

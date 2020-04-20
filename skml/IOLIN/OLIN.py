@@ -350,7 +350,8 @@ class OnlineNetwork(ABC):
 
         columns_type = Utils.get_columns_type(training_window_X_df)
 
-        remaining_attributes = np.setdiff1d(attributes_indexes, chosen_attributes, assume_unique=False).tolist()
+        remaining_attributes = set(attributes_indexes) - set(chosen_attributes)
+        remaining_attributes = list(remaining_attributes)
 
         global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
             self.classifier.choose_split_attribute(attributes_indexes=remaining_attributes,
@@ -485,14 +486,16 @@ class OnlineNetwork(ABC):
 
         curr_layer = copy_network.root_node.first_layer
         is_first_layer = True
+        converted = False
         nodes_data = {}
         while curr_layer is not None:
             for node in curr_layer.nodes:
                 if is_first_layer:
-                    if curr_layer.is_continuous:
+                    if curr_layer.is_continuous and not converted:
                         Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
                                                      chosen_attribute=curr_layer.index,
                                                      partial_X=training_window_X_copy)
+                        converted = True
 
                     partial_X, partial_y = Utils.drop_records(X=training_window_X_copy,
                                                               y=training_window_y_copy,
@@ -505,10 +508,11 @@ class OnlineNetwork(ABC):
                 else:
                     X = nodes_data[node.prev_node][0]
                     y = nodes_data[node.prev_node][1]
-                    if curr_layer.is_continuous:
+                    if curr_layer.is_continuous and not converted:
                         Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
                                                      chosen_attribute=curr_layer.index,
                                                      partial_X=X)
+                        converted = True
 
                     partial_X, partial_y = Utils.drop_records(X=X,
                                                               y=y,
@@ -518,6 +522,8 @@ class OnlineNetwork(ABC):
                     node.partial_y = partial_y
                     nodes_data[node.index] = [partial_X, partial_y]
 
+            is_first_layer = False
+            converted = False
             curr_layer = curr_layer.next_layer
 
         return copy_network

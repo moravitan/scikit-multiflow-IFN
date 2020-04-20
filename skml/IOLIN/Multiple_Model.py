@@ -77,9 +77,11 @@ class MultipleModel(OnlineNetwork):
                 i = i + 1
 
             X_batch_df = pd.DataFrame(X_batch)
+            X_batch_df_copy = X_batch_df.copy()
 
             if not self.classifier.is_fitted:  # cold start
-                self.classifier.fit(X=X_batch_df, y=y_batch)
+                self.classifier.fit(X=X_batch_df,
+                                    y=y_batch)
                 path = self.path + "/" + str(self.counter) + ".pickle"
                 pickle.dump(self.classifier, open(path, "wb"))
                 self.counter = self.counter + 1
@@ -89,10 +91,10 @@ class MultipleModel(OnlineNetwork):
             y_validation_samples = []
 
             while j < k:
-                X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
+                X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
+                X_validation_samples.append(X_validation_sample[0])
+                y_validation_samples.append(y_validation_sample[0])
                 j = j + 1
-
-            j = k
 
             Etr = self.classifier.calculate_error_rate(X=X_batch,
                                                        y=y_batch)
@@ -106,7 +108,6 @@ class MultipleModel(OnlineNetwork):
                 self._update_current_network(training_window_X=X_batch,
                                              training_window_y=y_batch)
             else:
-
                 unique, counts = np.unique(np.array(y_batch), return_counts=True)
                 target_distribution_current = counts[0] / len(y_batch)
                 # Entropy of target attribute on the current window
@@ -118,7 +119,7 @@ class MultipleModel(OnlineNetwork):
                 for classifier in classifier_files_names:
                     generated_clf = pickle.load(open(self.path + "/" + classifier, "rb"))
                     # Entropy of target attribute on a former window
-                    target_distribution_former = generated_clf.class_count[0] / len(y_batch)
+                    target_distribution_former = generated_clf.class_count[0][1] / len(y_batch)
                     E_former = stats.entropy([target_distribution_former, 1 - target_distribution_former], base=2)
                     generated_classifiers[classifier] = abs(E_current - E_former)
 
@@ -129,9 +130,24 @@ class MultipleModel(OnlineNetwork):
                 self.classifier = chosen_classifier
                 self._new_split_process(training_window_X=X_batch)  # add new layer if possible
 
+                # test the new chosen network on a new validation window
+                k = j + add_count
+                i = k
+                X_validation_samples = []
+                y_validation_samples = []
+
+                while j < k:
+                    X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
+                    X_validation_samples.append(X_validation_sample[0])
+                    y_validation_samples.append(y_validation_sample[0])
+                    j = j + 1
+
                 # error rate of the new chosen classifier on the new window
                 Etr = self.classifier.calculate_error_rate(X=X_batch,
                                                            y=y_batch)
+
+                Eval = self.classifier.calculate_error_rate(X=X_validation_samples,
+                                                            y=y_validation_samples)
 
                 max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
 
@@ -142,12 +158,14 @@ class MultipleModel(OnlineNetwork):
                 # If concept drift is detected again with the chosen network Create
                 # completely new network using the Info-Fuzzy algorithm
                 else:
-                    self.classifier.fit(X=X_batch_df,
+                    self.classifier.fit(X=X_batch_df_copy,
                                         y=y_batch)
                     path = self.path + "/" + str(self.counter) + ".pickle"
                     pickle.dump(self.classifier, open(path, "wb"))
 
             j = j + self.window
+            X_batch.clear()
+            y_batch.clear()
 
         last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
         return last_model
