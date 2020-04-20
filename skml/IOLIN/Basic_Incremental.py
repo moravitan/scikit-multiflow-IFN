@@ -47,7 +47,6 @@ class BasicIncremental(OnlineNetwork):
                     y_validation_samples.append(y_validation_sample[0])
                     j = j + 1
 
-                j = k
                 self._incremental_IN(X_batch, y_batch, X_validation_samples, y_validation_samples, add_count)
                 i = j - self.window
 
