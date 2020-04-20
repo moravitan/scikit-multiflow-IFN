@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 import copy
-from abc import ABC
+from abc import ABC, abstractmethod
 from skmultiflow.data import SEAGenerator
 from sklearn.utils.validation import check_X_y
 from skml import IfnClassifier
@@ -89,6 +89,10 @@ class OnlineNetwork(ABC):
     @classifier.setter
     def classifier(self, value: IfnClassifier):
         self._classifier = value
+
+    @abstractmethod
+    def generate(self):
+        pass
 
     def _update_current_network(self, training_window_X, training_window_y):
         """ This method, according to "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X"
@@ -330,6 +334,7 @@ class OnlineNetwork(ABC):
 
     def _new_split_process(self, training_window_X):
 
+        training_window_X_df = pd.DataFrame(training_window_X)
         curr_layer = self.classifier.network.root_node.first_layer
         last_layer = None
         chosen_attributes = []
@@ -343,7 +348,7 @@ class OnlineNetwork(ABC):
         chosen_attributes = set(chosen_attributes)
         attributes_indexes = list(range(0, len(training_window_X[0])))
 
-        columns_type = Utils.get_columns_type(training_window_X)
+        columns_type = Utils.get_columns_type(training_window_X_df)
 
         remaining_attributes = np.setdiff1d(attributes_indexes, chosen_attributes, assume_unique=False).tolist()
 

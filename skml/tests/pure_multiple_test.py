@@ -21,7 +21,7 @@ def test_pure_multiple():
     _setup_test_env()
     ifn = IfnClassifier(alpha)
     pure_IOLIN = PureMultiple(ifn, test_tmp_folder, n_min=0, n_max=60, Pe=0.7)
-    chosen_model = pure_IOLIN.pure_model_generation()
+    chosen_model = pure_IOLIN.generate()
     assert chosen_model is not None
     _clean_test_env()
 

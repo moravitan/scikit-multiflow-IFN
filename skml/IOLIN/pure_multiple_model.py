@@ -50,7 +50,7 @@ class PureMultiple(OnlineNetwork):
         super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
                          max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
-    def pure_model_generation(self):
+    def generate(self):
         """ This function is an implementation of Pure Multiple Model IOLIN algorithm as represented
             by Prof. Mark Last, et al. in "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X".
             This function obtain an IFN model for every window arriving in the stream,

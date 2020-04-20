@@ -18,7 +18,7 @@ class BasicIncremental(OnlineNetwork):
         super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
                          max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
-    def IN_controll(self):
+    def generate(self):
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
         i = self.n_min - self.window

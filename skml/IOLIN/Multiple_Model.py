@@ -52,7 +52,7 @@ class MultipleModel(OnlineNetwork):
         super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
                          max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
-    def multiple_model_generation(self):
+    def generate(self):
         """ This function is an implementation of Multiple Model IOLIN algorithm as represented
             by Prof. Mark Last, et al. in "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X".
             This function updates a current model as long as the concept is stable.
@@ -142,7 +142,7 @@ class MultipleModel(OnlineNetwork):
                 # If concept drift is detected again with the chosen network Create
                 # completely new network using the Info-Fuzzy algorithm
                 else:
-                    self.classifier.fit(X=X_batch,
+                    self.classifier.fit(X=X_batch_df,
                                         y=y_batch)
                     path = self.path + "/" + str(self.counter) + ".pickle"
                     pickle.dump(self.classifier, open(path, "wb"))
