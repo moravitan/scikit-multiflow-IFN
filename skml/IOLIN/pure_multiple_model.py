@@ -4,27 +4,15 @@ import os
 import numpy as np
 import pandas as pd
 from skml import IfnClassifier
-from skml.IOLIN import MetaLearning
+from skml.IOLIN import MetaLearning, OnlineNetwork
 from skmultiflow.data import SEAGenerator
 
 
-class PureMultiple:
+class PureMultiple(OnlineNetwork):
 
-    def __init__(self,
-                 classifier: IfnClassifier,
-                 path,
-                 number_of_classes=2,
-                 n_min=378,
-                 n_max=math.inf,
-                 alpha=0.99,
-                 Pe=0.5,
-                 init_add_count=10,
-                 inc_add_count=50,
-                 max_add_count=100,
-                 red_add_count=75,
-                 min_add_count=1,
-                 max_window=1000,
-                 data_stream_generator=SEAGenerator(random_state=1)):
+    def __init__(self, classifier: IfnClassifier, path, number_of_classes=2, n_min=378, n_max=math.inf, alpha=0.99,
+                 Pe=0.5, init_add_count=10, inc_add_count=50, max_add_count=100, red_add_count=75, min_add_count=1,
+                 max_window=1000, data_stream_generator=SEAGenerator(random_state=1)):
 
         """
         Parameters
@@ -59,24 +47,10 @@ class PureMultiple:
             Stream generator for the stream data
         """
 
-        self.classifier = classifier
-        self.path = path
-        self.n_min = n_min
-        self.n_max = n_max
-        self.Pe = Pe
-        self.alpha = alpha
-        self.init_add_count = init_add_count
-        self.inc_add_count = inc_add_count
-        self.max_add_count = max_add_count
-        self.red_add_count = red_add_count
-        self.min_add_count = min_add_count
-        self.max_window = max_window
-        self.window = None
-        self.meta_learning = MetaLearning(alpha, number_of_classes)
-        self.data_stream_generator = data_stream_generator
-        self.data_stream_generator.prepare_for_use()
+        super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
+                         max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
-    def pure_model_generation(self):
+    def generate(self):
         """ This function is an implementation of Pure Multiple Model IOLIN algorithm as represented
             by Prof. Mark Last, et al. in "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X".
             This function obtain an IFN model for every window arriving in the stream,
@@ -119,7 +93,9 @@ class PureMultiple:
                 y_validation_samples = []
 
                 while j < k:
-                    X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample()
+                    X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
+                    X_validation_samples.append(X_validation_sample[0])
+                    y_validation_samples.append(y_validation_sample[0])
                     j = j + 1
 
                 Eval = self.classifier.calculate_error_rate(X_validation_samples, y_validation_samples)
@@ -140,6 +116,8 @@ class PureMultiple:
                 counter = counter + 1
 
             j = j + self.window
+            X_batch.clear()
+            y_batch.clear()
 
         last_model = pickle.load(open(self.path + "/" + str(counter - 1) + ".pickle", "rb"))
         return last_model

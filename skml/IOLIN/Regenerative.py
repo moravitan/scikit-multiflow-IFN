@@ -50,9 +50,9 @@ class OnlineNetworkRegenerative(OnlineNetwork):
         super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
                          max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
-    def regenerate(self):
+    def generate(self):
         """ This function is an implementation to the regenerative algorithm as represented
-            by Prof. Mark Last in "https://content.iospress.com/articles/intelligent-data-analysis/ida00083".
+            by Prof. Mark Last, et al in "https://content.iospress.com/articles/intelligent-data-analysis/ida00083".
 
             This function obtain an IFN model for every window arriving in the stream,
             and validate the prediction on the next window, which represent the validation examples.
@@ -99,18 +99,12 @@ class OnlineNetworkRegenerative(OnlineNetwork):
             max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
 
             if abs(Eval - Etr) < max_diff:  # concept is stable
-                print("++++++++++++++++")
-                print("model is stable")
-                print("++++++++++++++++")
                 add_count = min(add_count * (1 + (self.inc_add_count / 100)), self.max_add_count)
                 self.window = min(self.window + add_count, self.max_window)
                 self.meta_learning.window = self.window
                 i = j - self.window
 
             else:  # concept drift detected
-                print("**********************")
-                print("concept drift detected")
-                print("**********************")
                 unique, counts = np.unique(np.array(y_batch), return_counts=True)
                 target_distribution = counts[0] / len(y_batch)
                 NI = len(self.classifier.network.root_node.first_layer.nodes)

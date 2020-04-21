@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 import copy
-from abc import ABC
+from abc import ABC, abstractmethod
 from skmultiflow.data import SEAGenerator
 from sklearn.utils.validation import check_X_y
 from skml import IfnClassifier
@@ -89,6 +89,10 @@ class OnlineNetwork(ABC):
     @classifier.setter
     def classifier(self, value: IfnClassifier):
         self._classifier = value
+
+    @abstractmethod
+    def generate(self):
+        pass
 
     def _update_current_network(self, training_window_X, training_window_y):
         """ This method, according to "https://www.sciencedirect.com/science/article/abs/pii/S156849460800046X"
@@ -330,6 +334,7 @@ class OnlineNetwork(ABC):
 
     def _new_split_process(self, training_window_X):
 
+        training_window_X_df = pd.DataFrame(training_window_X)
         curr_layer = self.classifier.network.root_node.first_layer
         last_layer = None
         chosen_attributes = []
@@ -343,9 +348,10 @@ class OnlineNetwork(ABC):
         chosen_attributes = set(chosen_attributes)
         attributes_indexes = list(range(0, len(training_window_X[0])))
 
-        columns_type = Utils.get_columns_type(training_window_X)
+        columns_type = Utils.get_columns_type(training_window_X_df)
 
-        remaining_attributes = np.setdiff1d(attributes_indexes, chosen_attributes, assume_unique=False).tolist()
+        remaining_attributes = set(attributes_indexes) - set(chosen_attributes)
+        remaining_attributes = list(remaining_attributes)
 
         global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
             self.classifier.choose_split_attribute(attributes_indexes=remaining_attributes,
@@ -480,14 +486,16 @@ class OnlineNetwork(ABC):
 
         curr_layer = copy_network.root_node.first_layer
         is_first_layer = True
+        converted = False
         nodes_data = {}
         while curr_layer is not None:
             for node in curr_layer.nodes:
                 if is_first_layer:
-                    if curr_layer.is_continuous:
+                    if curr_layer.is_continuous and not converted:
                         Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
                                                      chosen_attribute=curr_layer.index,
                                                      partial_X=training_window_X_copy)
+                        converted = True
 
                     partial_X, partial_y = Utils.drop_records(X=training_window_X_copy,
                                                               y=training_window_y_copy,
@@ -500,10 +508,11 @@ class OnlineNetwork(ABC):
                 else:
                     X = nodes_data[node.prev_node][0]
                     y = nodes_data[node.prev_node][1]
-                    if curr_layer.is_continuous:
+                    if curr_layer.is_continuous and not converted:
                         Utils.convert_numeric_values(chosen_split_points=curr_layer.split_points,
                                                      chosen_attribute=curr_layer.index,
                                                      partial_X=X)
+                        converted = True
 
                     partial_X, partial_y = Utils.drop_records(X=X,
                                                               y=y,
@@ -513,6 +522,8 @@ class OnlineNetwork(ABC):
                     node.partial_y = partial_y
                     nodes_data[node.index] = [partial_X, partial_y]
 
+            is_first_layer = False
+            converted = False
             curr_layer = curr_layer.next_layer
 
         return copy_network

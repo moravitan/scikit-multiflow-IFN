@@ -1,11 +1,13 @@
 import os
+import pytest
 import shutil
-from skml.IOLIN import PureMultiple
+
+from skml.IOLIN import MultipleModel
 from skml import IfnClassifier
 
 
 alpha = 0.99
-test_tmp_folder = "tmpPureMultiple"
+test_tmp_folder = "tmpMultipleModel"
 
 
 def _setup_test_env():
@@ -20,8 +22,8 @@ def _clean_test_env():
 def test_pure_multiple():
     _setup_test_env()
     ifn = IfnClassifier(alpha)
-    pure_IOLIN = PureMultiple(ifn, test_tmp_folder, n_min=0, n_max=60, Pe=0.7)
-    chosen_model = pure_IOLIN.generate()
+    multiple_model = MultipleModel(ifn, test_tmp_folder, n_min=0, n_max=200, Pe=0.7)
+    chosen_model = multiple_model.generate()
     assert chosen_model is not None
     _clean_test_env()
 

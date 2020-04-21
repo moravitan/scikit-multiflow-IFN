@@ -18,7 +18,7 @@ class BasicIncremental(OnlineNetwork):
         super().__init__(classifier, path, number_of_classes, n_min, n_max, alpha, Pe, init_add_count, inc_add_count,
                          max_add_count, red_add_count, min_add_count, max_window, data_stream_generator)
 
-    def IN_controll(self):
+    def generate(self):
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
         i = self.n_min - self.window
@@ -42,13 +42,11 @@ class BasicIncremental(OnlineNetwork):
                 y_validation_samples = []
 
                 while j < k:
-                    X_validation, y_validation = self.data_stream_generator.next_sample()
-                    X_validation_samples.append(X_validation[0])
-                    y_validation_samples.append(y_validation[0])
+                    X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
+                    X_validation_samples.append(X_validation_sample[0])
+                    y_validation_samples.append(y_validation_sample[0])
                     j = j + 1
 
-                j = k
-                # X_batch_df = pd.DataFrame(X_batch)
                 self._incremental_IN(X_batch, y_batch, X_validation_samples, y_validation_samples, add_count)
                 i = j - self.window
 
@@ -61,7 +59,7 @@ class BasicIncremental(OnlineNetwork):
                 pickle.dump(self.classifier, open(path, "wb"))
                 self.counter = self.counter + 1
 
-
+            j = j + self.window
             X_batch.clear()
             y_batch.clear()
 
