@@ -309,6 +309,8 @@ class IfnClassifier():
             self.training_error = 0
             # is fitted: True/False
             self.is_fitted_ = False
+            # y_cols: list of attributes targets
+            self.y_cols = []
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
@@ -336,16 +338,16 @@ class IfnClassifier():
 
         cols = list(X.columns.values)
         columns_type = _get_columns_type(X)
-
-        X, y = check_X_y(X, y, accept_sparse=True,multi_output=True)
+        self.y_cols = list(y.columns.values)
+        X, y = check_X_y(X, y, accept_sparse=True, multi_output=True)
         class_count = {}
-        for i in range(0, np.size(y, 1)):
+        for i in self.y_cols:
             self.total_records = np.size(y, 0)
-            unique, counts = np.unique(np.array(y[:, i]), return_counts=True)
+            unique, counts = np.unique(np.array(y[:, self.y_cols.index(i)]), return_counts=True)
             class_count[i] = np.asarray((unique, counts)).T
             if len(unique) > self.num_of_classes:
                 self.num_of_classes = len(unique)
-            self.network.build_target_layer(unique, i)
+            self.network.build_target_layer(unique, self.y_cols.index(i))
 
         # create list the holds the attributes indexes
         attributes_indexes = list(range(0, len(X[0])))
@@ -502,7 +504,6 @@ class IfnClassifier():
         print("Done. Network is fitted")
         self.training_error = self.calculate_error_rate(X=X, y=y)
         # print("the training error is " + str(self.training_error))
-
         return self
 
     def predict(self, X):
@@ -520,7 +521,7 @@ class IfnClassifier():
         """
         X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
-        # {key: num of target, value: list of predict values}
+        # {key: name of target, value: list of predict values}
         predicted = {}
         for record in X:
             curr_layer = self.network.root_node.first_layer
@@ -550,21 +551,22 @@ class IfnClassifier():
                             curr_layer = curr_layer.next_layer
                             prev_node_index = chosen_node.index
                         break
+        predicted_df = pd.DataFrame.from_dict(predicted)
+        if self.multi_label is False:
+            predicted_df.to_csv('predict_multi_target.csv')
+        else:
+            with open('predict_multi_label.txt', 'w') as f:
+                predicted_label = {}
+                for index, row in predicted_df.iterrows():
+                    row_label = []
+                    for i in range(0, len(row)):
+                        if row[i] != 0:
+                            row_label.append(self.y_cols[i])
+                    predicted_label[index] = row_label
+                    f.write(str(index) + '. ' + str(row_label) + '\n')
+                f.close()
 
-        # index = 1
-        # if self.multi_label is False:
-        #     with open('predict.txt', 'w') as f:
-        #         for key in predicted.keys():
-        #             index = 1
-        #             f.write('prediction to key: ' + str(key) + '\n')
-        #             for row in predicted[key]:
-        #                 f.write(str(index) + '. ' + str(row) + '\n')
-        #                 index += 1
-        #         f.close()
-        # else:
-        pd.DataFrame.from_dict(predicted).to_csv('predict_multi_df.csv')
-
-        return pd.DataFrame.from_dict(predicted)
+        return predicted_df
 
     def predict_proba(self, X):
         """ A reference implementation of a predicting probabilities function.
@@ -597,7 +599,7 @@ class IfnClassifier():
                         chosen_node = node
                         if chosen_node.is_terminal:
                             for key in chosen_node.weight_probability_pair.keys():
-                                if not key in predicted.keys():
+                                if key not in predicted.keys():
                                     predicted[key] = []
                                 found_terminal_node = True
                                 weights_of_node = []
@@ -608,19 +610,9 @@ class IfnClassifier():
                             curr_layer = curr_layer.next_layer
                             prev_node_index = chosen_node.index
                         break
-
-        # index = 1
-        # with open('predict.txt', 'w') as f:
-        #     for key in predicted.keys():
-        #         index = 1
-        #         f.write('prediction to key: ' + str(key) + '\n')
-        #         for row in predicted[key]:
-        #             f.write(str(index) + '. ' + str(row) + '\n')
-        #             index += 1
-        #     f.close()
-        pd.DataFrame.from_dict(predicted).to_csv('predict_prob_multi_df.csv')
-
-        return pd.DataFrame.from_dict(predicted)
+        predicted_df = pd.DataFrame.from_dict(predicted)
+        predicted_df.to_csv('predict_prob_multi.csv')
+        return predicted_df
 
     # the same function
     def _choose_split_attribute(self, attributes_indexes, columns_type, nodes=None, X=None, y=None):
@@ -1054,7 +1046,6 @@ class IfnClassifier():
         class_count: (list of length n contain tuples)
             Contain list of tuples - (class value, number of appearances in the train set).
 
-
         Returns
         -------
             The weights for each class.
@@ -1066,12 +1057,13 @@ class IfnClassifier():
             weights_per_class[key] = {}
             for class_info in class_count[key]:
                 cut_len = 0
-                if len(y) > key:
-                    cut_len = len(np.extract(y[key] == class_info[0], y[key]))
+                key_index = self.y_cols.index(key)
+                if len(y) > key_index:
+                    cut_len = len(np.extract(y[key_index] == class_info[0], y[key_index]))
                 if cut_len != 0:
                     weight = (cut_len / self.total_records) \
-                             * (math.log((cut_len / len(y[key])) / (class_info[1] / self.total_records), 2))
-                    weights_per_class[key][class_info[0]] = (weight, (cut_len / len(y[key])))
+                             * (math.log((cut_len / len(y[key_index])) / (class_info[1] / self.total_records), 2))
+                    weights_per_class[key][class_info[0]] = (weight, (cut_len / len(y[key_index])))
                 else:
                     weights_per_class[key][class_info[0]] = (0, 0)
         return weights_per_class
@@ -1161,7 +1153,6 @@ class IfnClassifier():
                 record[chosen_attribute] = _find_split_position(value=record[chosen_attribute],
                                                                 positions=chosen_split_points)
 
-    # the same function
     def _set_terminal_nodes(self, nodes, class_count):
         """ Connecting the given nodes to the terminal nodes in the network.
 
@@ -1172,7 +1163,6 @@ class IfnClassifier():
 
         class_count: (list of length n contain tuples)
             Contain list of tuples - (class value, number of appearances in the train set).
-
 
         """
 
