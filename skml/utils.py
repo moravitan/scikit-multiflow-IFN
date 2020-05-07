@@ -26,7 +26,7 @@ def binary_search(array: list, left: int, right: int, value):
 
 
     """
-    if array is None or len(array) == 0 or left < 0 or len(array) <= right:
+    if array is None or len(array) == 0 or left < 0 or len(array) < right:
         return -1
 
     # Check base case
