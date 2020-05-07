@@ -907,7 +907,17 @@ class IfnClassifier():
 
     def calculate_error_rate(self, X, y):
 
-        return 1 - self.score(X=X, y=y, sample_weight=None)
+        correct = 0
+        for i in range(len(y)):
+            predicted_value = self.predict([X[i]])[0]
+            # predicted_value = self.predict(X.iloc[[i]])[0]
+            if predicted_value == y[i]:
+                correct += 1
+
+        error_rate = (len(y) - correct) / len(y)
+        return error_rate
+
+        # return 1 - self.score(X=X, y=y, sample_weight=None)
 
     def partial_fit(self, X, y, classes=None, sample_weight=None):
         raise NotImplementedError()
