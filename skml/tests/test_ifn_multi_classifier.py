@@ -1,7 +1,7 @@
 import pickle
 import pandas as pd
 from sklearn.metrics import accuracy_score
-from skml.multi.ifn_classifier_multi import IfnClassifier
+from skml.multi.ifn_classifier_multi import IfnClassifierMulti
 from skml.multi._data_processing_multi import DataProcessor
 import pytest
 import os
@@ -25,7 +25,7 @@ def _setup_test_env():
 
 def test_classifier_const_dataset(multi_label=False):
     _setup_test_env()
-    clf = IfnClassifier(alpha, multi_label)
+    clf = IfnClassifierMulti(alpha, multi_label)
     dp = DataProcessor()
     x_train, x_test, y_train, y_test = dp.convert(dataset_path, test_size_percentage)
 
@@ -41,7 +41,7 @@ def test_classifier_const_dataset(multi_label=False):
 
 def test__model_pickle_const_dataset(multi_label=False):
     _setup_test_env()
-    clf = IfnClassifier(alpha, multi_label)
+    clf = IfnClassifierMulti(alpha, multi_label)
     dp = DataProcessor()
     x_train, x_test, y_train, y_test = dp.convert(dataset_path, test_size_percentage)
 
