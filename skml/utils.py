@@ -255,6 +255,7 @@ def get_columns_type(X):
         An array_like object of length n contains in each position the type of the corresponding attribute in X.
 
     """
+
     columns_type = []
     for dt in X.columns:
         if len(np.unique(X[dt])) > 10:
