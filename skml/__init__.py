@@ -1,10 +1,10 @@
 
-from .ifn_Classifier import IfnClassifier
-from .IOLIN.Meta_Learning import MetaLearning
-from .IOLIN.OLIN import OnlineNetwork
-from .IOLIN.Regenerative import OnlineNetworkRegenerative
-from .IOLIN.Basic_Incremental import BasicIncremental
-from .IOLIN.pure_multiple_model import PureMultiple
+from .ifn_classifier import IfnClassifier
+from .IOLIN.meta_learning import MetaLearning
+from .IOLIN.olin import OnlineNetwork
+from .IOLIN.ifn_regenerative import OnlineNetworkRegenerative
+from .IOLIN.ifn_basic_incremental import BasicIncremental
+from .IOLIN.ifn_pure_multiple_model import PureMultiple
 
 from ._version import __version__
 

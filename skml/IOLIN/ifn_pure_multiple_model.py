@@ -10,7 +10,7 @@ from skmultiflow.data import SEAGenerator
 
 class PureMultiple(OnlineNetwork):
 
-    def __init__(self, classifier: IfnClassifier, path, number_of_classes=2, n_min=378, n_max=math.inf, alpha=0.99,
+    def __init__(self, classifier, path, number_of_classes=2, n_min=378, n_max=math.inf, alpha=0.99,
                  Pe=0.5, init_add_count=10, inc_add_count=50, max_add_count=100, red_add_count=75, min_add_count=1,
                  max_window=1000, data_stream_generator=SEAGenerator(random_state=1)):
 
@@ -59,7 +59,6 @@ class PureMultiple(OnlineNetwork):
 
         """
 
-        counter = 1
         self.window = self.meta_learning.calculate_Wint(self.Pe)
         i = 0
         j = self.window
@@ -74,15 +73,26 @@ class PureMultiple(OnlineNetwork):
                 X_batch.append(X[0])
                 y_batch.append(y[0])
                 i = i + 1
+
             X_batch_df = pd.DataFrame(X_batch)
 
             if os.path.exists(self.path) and len(os.listdir(self.path)) > 0:
+
                 classifier_files_names = os.listdir(self.path)
                 generated_classifiers = {}
+
+                unique, counts = np.unique(np.array(y_batch), return_counts=True)
+                target_distribution_current = counts[0] / len(y_batch)
+
+                # Entropy of target attribute on the current window
+                E_current = stats.entropy([target_distribution_current, 1 - target_distribution_current], base=2)
+
                 for classifier in classifier_files_names:
                     generated_clf = pickle.load(open(self.path + "/" + classifier, "rb"))
-                    generated_classifiers[classifier] = abs(generated_clf.calculate_error_rate(X_batch_df, y_batch) -
-                                                            classifier.calculate_error_rate(X_batch_df, y_batch))
+                    target_distribution_former = generated_clf.class_count[0][1] / len(y_batch)
+                    E_former = stats.entropy([target_distribution_former, 1 - target_distribution_former], base=2)
+                    generated_classifiers[classifier] = abs(E_current - E_former)
+
                 chosen_classifier_name = min(generated_classifiers, key=generated_classifiers.get)
                 chosen_classifier = pickle.load(open(self.path + "/" + chosen_classifier_name, "rb"))
 
@@ -104,20 +114,20 @@ class PureMultiple(OnlineNetwork):
                 if abs(Eval - Etr) > max_diff:  # concept drift detected
                     chosen_classifier = IfnClassifier(self.alpha)
                     chosen_classifier.fit(X_batch_df, y_batch)
-                    path = self.path + "/" + str(counter)
+                    path = self.path + "/" + str(self.counter)
                     pickle.dump(self.classifier, open(path, "wb"))
-                    counter = counter + 1
+                    self.counter = self.counter + 1
 
             else:  # cold start
                 chosen_classifier = IfnClassifier(self.alpha)
                 chosen_classifier.fit(X_batch_df, y_batch)
-                path = self.path + "/" + str(counter) + ".pickle"
+                path = self.path + "/" + str(self.counter) + ".pickle"
                 pickle.dump(self.classifier, open(path, "wb"))
-                counter = counter + 1
+                self.counter = self.counter + 1
 
             j = j + self.window
             X_batch.clear()
             y_batch.clear()
 
-        last_model = pickle.load(open(self.path + "/" + str(counter - 1) + ".pickle", "rb"))
+        last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
         return last_model

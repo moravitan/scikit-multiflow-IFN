@@ -6,16 +6,15 @@ import copy
 from abc import ABC, abstractmethod
 from skmultiflow.data import SEAGenerator
 from sklearn.utils.validation import check_X_y
-from skml import IfnClassifier
 from skml.IOLIN import MetaLearning
-import skml.Utils as Utils
+import skml.utils as Utils
 from skml._ifn_network import HiddenLayer
 
 
 class OnlineNetwork(ABC):
 
     def __init__(self,
-                 classifier: IfnClassifier,
+                 classifier,
                  path,
                  number_of_classes=2,
                  n_min=378,
@@ -87,7 +86,7 @@ class OnlineNetwork(ABC):
         return self._classifier
 
     @classifier.setter
-    def classifier(self, value: IfnClassifier):
+    def classifier(self, value):
         self._classifier = value
 
     @abstractmethod
@@ -439,7 +438,7 @@ class OnlineNetwork(ABC):
         next_layer_nodes = []
         nodes_to_eliminate = []
 
-        if nodes is None or len(nodes) == 0 or layer is None:
+        if nodes is None or len(nodes) == 0 or layer is None or prev_layer is None:
             return
 
         curr_layer_nodes = layer.nodes

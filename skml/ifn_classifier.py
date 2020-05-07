@@ -6,15 +6,16 @@ License: BSD 3 clause
 import numpy as np
 from ._ifn_network import IfnNetwork, HiddenLayer
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from skmultiflow.core import BaseSKMObject, ClassifierMixin
+from skml import utils
 from scipy import stats
 import math
 import collections
 import time
 import sys
-import skml.Utils as Utils
 
 
-class IfnClassifier():
+class IfnClassifier(BaseSKMObject, ClassifierMixin):
     """ A template estimator to be used as a reference implementation.
 
     For more information regarding how to build your own estimator, read more
@@ -58,16 +59,21 @@ class IfnClassifier():
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetwork()
 
-    def fit(self, X, y, sample_weight=None):
+    def fit(self, X, y, classes=None, sample_weight=None):
 
         """A reference implementation of a fitting function.
 
         Parameters
         ----------
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
-            The training input samples upon which the transforms/estimator will create their model.
-        y : array-like, shape = [n_samples]
-            The target values.
+        X: numpy.ndarray of shape (n_samples, n_features)
+            Instance attributes.
+        y: array_like
+            Classes (targets) for all samples in X.
+        classes: numpy.array
+            Contains the class values in the stream. If defined, will be used
+            to define the length of the arrays returned by `predict_proba`
+        sample_weight: float or array-like
+            Samples weight. If not provided, uniform weights are assumed.
 
         Returns
         -------
@@ -79,7 +85,7 @@ class IfnClassifier():
         cols = list(X.columns.values)
         cols = [str(i) for i in cols]
 
-        columns_type = Utils.get_columns_type(X)
+        columns_type = utils.get_columns_type(X)
 
         X, y = check_X_y(X, y, accept_sparse=True)
 
@@ -134,7 +140,7 @@ class IfnClassifier():
                 if curr_node_index == 1:
                     print('No Nodes at the network. choose smaller alpha')
                     sys.exit()
-                Utils.write_details_to_file(layer_position=layer,
+                utils.write_details_to_file(layer_position=layer,
                                             attributes_cmi=attributes_mi,
                                             chosen_attribute_index=global_chosen_attribute,
                                             chosen_attribute=cols[global_chosen_attribute])
@@ -175,7 +181,7 @@ class IfnClassifier():
                         unique_values = np.unique(attribute_data_in_node)
                         prev_node = node.index
                         for i in unique_values:
-                            attribute_node = Utils.create_attribute_node(partial_X=partial_X,
+                            attribute_node = utils.create_attribute_node(partial_X=partial_X,
                                                                          partial_y=partial_y,
                                                                          chosen_attribute_index=global_chosen_attribute,
                                                                          attribute_value=i,
@@ -190,7 +196,7 @@ class IfnClassifier():
             else:
                 prev_node = 0
                 for i in self.unique_values_per_attribute[global_chosen_attribute]:
-                    attribute_node = Utils.create_attribute_node(partial_X=X,
+                    attribute_node = utils.create_attribute_node(partial_X=X,
                                                                  partial_y=y,
                                                                  chosen_attribute_index=global_chosen_attribute,
                                                                  attribute_value=i,
@@ -220,7 +226,7 @@ class IfnClassifier():
             current_layer = next_layer
             number_of_layers += 1
 
-            Utils.write_details_to_file(layer_position=layer,
+            utils.write_details_to_file(layer_position=layer,
                                         attributes_cmi=attributes_mi,
                                         chosen_attribute_index=global_chosen_attribute,
                                         chosen_attribute=cols[global_chosen_attribute])
@@ -251,7 +257,7 @@ class IfnClassifier():
 
         self.training_error = self.calculate_error_rate(X=X, y=y)
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
-            Utils.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
+            utils.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
 
         if self.index_of_sec_best_att != -1 and 'category' not in columns_type[self.index_of_sec_best_att]:
             self.sec_att_split_points = self.split_points[self.index_of_sec_best_att]
@@ -285,7 +291,7 @@ class IfnClassifier():
             while curr_layer is not None and not found_terminal_node:
                 record_value = record[curr_layer.index]
                 if curr_layer.is_continuous:
-                    record_value = Utils.find_split_position(value=record_value,
+                    record_value = utils.find_split_position(value=record_value,
                                                              positions=curr_layer.split_points)
                 for node in curr_layer.nodes:
                     if node.attribute_value == record_value and node.prev_node == prev_node_index:
@@ -336,7 +342,7 @@ class IfnClassifier():
             while curr_layer is not None and not found_terminal_node:
                 record_value = record[curr_layer.index]
                 if curr_layer.is_continuous is not False:
-                    record_value = Utils.find_split_position(value=record_value,
+                    record_value = utils.find_split_position(value=record_value,
                                                              positions=curr_layer.split_points)
                 for node in curr_layer.nodes:
                     if node.attribute_value == record_value and node.prev_node == prev_node_index:
@@ -413,8 +419,8 @@ class IfnClassifier():
             else:
                 if is_continuous:
                     splitted_nodes = self._choose_split_numeric_attribute(attribute_index=attribute_index,
-                                                                         attributes_mi=attributes_mi,
-                                                                         nodes=nodes)
+                                                                          attributes_mi=attributes_mi,
+                                                                          nodes=nodes)
                     self.nodes_splitted_per_attribute[attribute_index] = splitted_nodes
                 else:
                     for node in nodes:
@@ -582,7 +588,7 @@ class IfnClassifier():
         for T in iterator:
             if T in self.split_points[attribute_index]: continue
             if nodes is None:
-                t_attribute_date, new_y = Utils.split_data_to_two_intervals(interval=interval,
+                t_attribute_date, new_y = utils.split_data_to_two_intervals(interval=interval,
                                                                             T=T,
                                                                             min_value=min_value,
                                                                             max_value=max_value)
@@ -605,7 +611,7 @@ class IfnClassifier():
                     attribute_data = list(partial_X[:, attribute_index])
                     data_class_array = list(zip(attribute_data, partial_y))
 
-                    t_attribute_date, new_y = Utils.split_data_to_two_intervals(interval=data_class_array,
+                    t_attribute_date, new_y = utils.split_data_to_two_intervals(interval=data_class_array,
                                                                                 T=T,
                                                                                 min_value=min_value,
                                                                                 max_value=max_value)
@@ -648,7 +654,7 @@ class IfnClassifier():
 
             # Find the split point index in the interval using binary search
             l = [e[0] for e in interval]
-            split_point_index = Utils.binary_search(l, 0, len(l), split_point)
+            split_point_index = utils.binary_search(l, 0, len(l), split_point)
             # Split the interval into two intervals
             # smaller - includes all the elements where their value is smaller than split point
             interval_smaller = interval[0: split_point_index]
@@ -871,13 +877,13 @@ class IfnClassifier():
                     partial_x = node.partial_x
                     # convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
                     for record in partial_x:
-                        record[chosen_attribute] = Utils.find_split_position(value=record[chosen_attribute],
+                        record[chosen_attribute] = utils.find_split_position(value=record[chosen_attribute],
                                                                              positions=chosen_split_points)
         # First layer
         else:
             # Convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
             for record in partial_X:
-                record[chosen_attribute] = Utils.find_split_position(value=record[chosen_attribute],
+                record[chosen_attribute] = utils.find_split_position(value=record[chosen_attribute],
                                                                      positions=chosen_split_points)
 
     def set_terminal_nodes(self, nodes, class_count):
@@ -902,12 +908,7 @@ class IfnClassifier():
 
     def calculate_error_rate(self, X, y):
 
-        X = check_array(X, accept_sparse=True)
-        correct = 0
-        for i in range(len(y)):
-            predicted_value = self.predict([X[i]])[0]
-            if predicted_value == y[i]:
-                correct += 1
+        return 1 - self.score(X=X, y=y, sample_weight=None)
 
-        error_rate = (len(y) - correct) / len(y)
-        return error_rate
+    def partial_fit(self, X, y, classes=None, sample_weight=None):
+        raise NotImplementedError()

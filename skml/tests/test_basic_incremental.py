@@ -1,8 +1,8 @@
 import os
 import shutil
+import pytest
 from skml.IOLIN import BasicIncremental
 from skml import IfnClassifier
-
 
 alpha = 0.99
 test_tmp_folder = "tmpOLIN"
@@ -21,9 +21,9 @@ def test_OLIN():
     _setup_test_env()
     ifn = IfnClassifier(alpha)
     basic_incremental = BasicIncremental(ifn, test_tmp_folder, n_min=0, n_max=200, Pe=0.7)
-    basic_incremental.generate()
+    last_model = basic_incremental.generate()
+    assert last_model is not None
     _clean_test_env()
-
 
 
 test_OLIN()

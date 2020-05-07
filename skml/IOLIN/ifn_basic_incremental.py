@@ -1,17 +1,14 @@
 import math
 import pickle
-
 import pandas as pd
 
 from skmultiflow.data import SEAGenerator
-from skml import IfnClassifier
-
-from skml.IOLIN.OLIN import OnlineNetwork
+from skml.IOLIN import OnlineNetwork
 
 
 class BasicIncremental(OnlineNetwork):
 
-    def __init__(self, classifier: IfnClassifier, path, number_of_classes=2, n_min=378, n_max=math.inf, alpha=0.99,
+    def __init__(self, classifier, path, number_of_classes=2, n_min=378, n_max=math.inf, alpha=0.99,
                  Pe=0.5, init_add_count=10, inc_add_count=50, max_add_count=100, red_add_count=75, min_add_count=1,
                  max_window=1000, data_stream_generator=SEAGenerator()):
 
@@ -35,7 +32,7 @@ class BasicIncremental(OnlineNetwork):
                 y_batch.append(y[0])
                 i = i + 1
 
-            if self.classifier.is_fitted: # the network already fitted at least one time before
+            if self.classifier.is_fitted:  # the network already fitted at least one time before
 
                 k = j + add_count
                 X_validation_samples = []
@@ -55,13 +52,16 @@ class BasicIncremental(OnlineNetwork):
                 self.classifier.fit(X_batch_df, y_batch)
                 j = j + self.window
                 # save the model
-                path = self.path + "/" + str(self.counter)
+                path = self.path + "/" + str(self.counter) + ".pickle"
                 pickle.dump(self.classifier, open(path, "wb"))
                 self.counter = self.counter + 1
 
             j = j + self.window
             X_batch.clear()
             y_batch.clear()
+
+        last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
+        return last_model
 
     def _incremental_IN(self,
                         training_window_X,
