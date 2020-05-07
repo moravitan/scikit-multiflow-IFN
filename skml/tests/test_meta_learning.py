@@ -1,59 +1,53 @@
 from skml import MetaLearning
+import pytest
 
 alpha = 0.99
 number_of_classes = 2
 Pe = 0.5
+meta_learning = MetaLearning(alpha, number_of_classes)
 
 
-def test_calculate_initial_window_size_default_values():
-    meta_learning = MetaLearning(alpha, number_of_classes)
-    initial_window = meta_learning.calculate_Wint(Pe)
+def test_suite_calculate_initial_window_size():
+    initial_window = meta_learning.calculate_Wint(0.5)
+    assert initial_window == 0
 
-    expected = 0
+    initial_window = meta_learning.calculate_Wint(0.7)
+    assert initial_window == 40
 
-    assert initial_window == expected
-
-
-def test_calculate_initial_window_size():
-    Pe = 0.7
-    meta_learning = MetaLearning(alpha, number_of_classes)
-    initial_window = meta_learning.calculate_Wint(Pe)
-
-    expected = 40
-
-    assert initial_window == expected
+    # invalid input
+    with pytest.raises(ValueError):
+        meta_learning.calculate_Wint(-1)
 
 
-def test_calculate_window_size():
-    NI = 2
-    T = 0.4
-    Etr = 0.8
+def test_suite_calculate_window_size():
+    window = meta_learning.calculate_new_window(NI=2, T=0.4, Etr=0.8)
+    assert window == 19
 
-    meta_learning = MetaLearning(alpha, number_of_classes)
-    window = meta_learning.calculate_new_window(NI,T,Etr)
-
-    expected = 19
-
-    assert window == expected
-
-
-def test_max_diff():
-    Pe = 0.7
-    Etr = 0.9
-    Eval = 0.8
-    add_count = 10
-
-    meta_learning = MetaLearning(alpha, number_of_classes)
-    meta_learning.calculate_Wint(Pe)
-    max_diff = meta_learning.get_max_diff(Etr, Eval, add_count)
-
-    expected = 0.04245584870124533
-
-    assert max_diff == expected
+    # invalid input
+    with pytest.raises(ValueError):
+        meta_learning.calculate_new_window(NI=1, T=0.4, Etr=0.8)
+    with pytest.raises(ValueError):
+        meta_learning.calculate_new_window(NI=2, T=2, Etr=0.8)
+    with pytest.raises(ValueError):
+        meta_learning.calculate_new_window(NI=2, T=0.4, Etr=2)
 
 
-test_calculate_initial_window_size_default_values()
-test_calculate_initial_window_size()
-test_calculate_window_size()
-test_max_diff()
+def test_suite_max_diff():
+    meta_learning.calculate_Wint(Pe=0.7)
+    max_diff = meta_learning.get_max_diff(Etr=0.9, Eval=0.8, add_count=10)
 
+    assert max_diff == 0.04245584870124533
+
+    meta_learning.calculate_Wint(Pe=0.7)
+    # invalid input
+    with pytest.raises(ValueError):
+        meta_learning.get_max_diff(Etr=2, Eval=0.8, add_count=10)
+    with pytest.raises(ValueError):
+        meta_learning.get_max_diff(Etr=0.9, Eval=2, add_count=10)
+    with pytest.raises(ValueError):
+        meta_learning.get_max_diff(Etr=0.9, Eval=0.8, add_count=-2)
+
+
+test_suite_calculate_initial_window_size()
+test_suite_calculate_window_size()
+test_suite_max_diff()

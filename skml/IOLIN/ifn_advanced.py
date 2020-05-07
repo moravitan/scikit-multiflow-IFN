@@ -4,11 +4,11 @@ import pickle
 import pandas as pd
 from skmultiflow.data import SEAGenerator
 
-from skml import OnlineNetwork, IfnClassifier, utils
+from skml import IncrementalOnlineNetwork, IfnClassifier, utils
 from skml._ifn_network import IfnNetwork
 
 
-class Advanced(OnlineNetwork):
+class Advanced(IncrementalOnlineNetwork):
 
     def __init__(self, classifier: IfnClassifier, path, number_of_classes=2, n_min=378, n_max=math.inf, alpha=0.99,
                  Pe=0.5, init_add_count=10, inc_add_count=50, max_add_count=100, red_add_count=75, min_add_count=1,
@@ -33,9 +33,9 @@ class Advanced(OnlineNetwork):
                 i = i + 1
 
             if self.classifier.is_fitted:  # the network already fitted at least one time before
-                cloned_network = OnlineNetwork.clone_network(network=self.classifier.network,
-                                                             training_window_X=X_batch,
-                                                             training_window_y=y_batch)
+                cloned_network = IncrementalOnlineNetwork.clone_network(network=self.classifier.network,
+                                                                        training_window_X=X_batch,
+                                                                        training_window_y=y_batch)
 
                 self.__network_update(cloned_network=cloned_network)
 

@@ -8,7 +8,7 @@ import filecmp
 import numpy as np
 import shutil
 
-dataset_path = "datasets/credit.csv"
+dataset_path = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit.csv"
 test_size_percentage = 0.3
 alpha = 0.99
 test_tmp_folder = "tmp"
@@ -19,26 +19,27 @@ def _clean_test_env():
 
 
 def _setup_test_env():
-    os.mkdir(test_tmp_folder)
+    if not os.path.isdir(test_tmp_folder):
+        os.mkdir(test_tmp_folder)
 
 
-def test_classifier_const_dataset():
-    _setup_test_env()
-    clf = IfnClassifier(alpha)
-    dp = DataProcessor()
-    x_train, x_test, y_train, y_test = dp.convert(dataset_path, test_size_percentage)
-
-    clf.fit(x_train, y_train)
-    clf.network.create_network_structure_file()
-    y_pred = clf.predict(x_test)
-
-    expected_pred = np.array([1, 2, 3, 4, 5])  # maybe change to get from file
-
-    assert filecmp.cmp('tmp/network_structure.txt', 'expert_network_structure.txt') is True
-    assert np.array_equal(y_pred, expected_pred)
-    assert accuracy_score(y_test, y_pred) == accuracy_score(y_test, expected_pred)
-
-    _clean_test_env()
+# def test_classifier_const_dataset():
+#     _setup_test_env()
+#     clf = IfnClassifier(alpha)
+#     dp = DataProcessor()
+#     x_train, x_test, y_train, y_test = dp.convert(dataset_path, test_size_percentage)
+#
+#     clf.fit(x_train, y_train)
+#     clf.network.create_network_structure_file()
+#     y_pred = clf.predict(x_test)
+#
+#     expected_pred = np.array([1, 2, 3, 4, 5])  # maybe change to get from file
+#
+#     assert filecmp.cmp('tmp/network_structure.txt', 'expert_network_structure.txt') is True
+#     assert np.array_equal(y_pred, expected_pred)
+#     assert accuracy_score(y_test, y_pred) == accuracy_score(y_test, expected_pred)
+#
+#     _clean_test_env()
 
 
 def test__model_pickle_const_dataset():

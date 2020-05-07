@@ -138,7 +138,8 @@ class IfnClassifier():
             if global_chosen_attribute == -1:
                 if curr_node_index == 1:
                     print('No Nodes at the network. choose smaller alpha')
-                    sys.exit()
+                    return
+                    # sys.exit()
                 utils.write_details_to_file(layer_position=layer,
                                             attributes_cmi=attributes_mi,
                                             chosen_attribute_index=global_chosen_attribute,

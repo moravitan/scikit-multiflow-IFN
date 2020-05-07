@@ -151,7 +151,7 @@ def test_eliminate_some_nodes_in_layer():
 def test_clone_network():
     _setup_eliminate_nodes_test_env()
     dp = DataProcessor()
-    x_train, x_test, y_train, y_test = dp.convert(csv_file_path="datasets/credit.csv",
+    x_train, x_test, y_train, y_test = dp.convert(csv_file_path="C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit.csv",
                                                   test_size=0.3)
 
     x_train, y_train = check_X_y(x_train, y_train, accept_sparse=True)
