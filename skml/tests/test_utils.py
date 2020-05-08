@@ -2,6 +2,8 @@ from skml import utils
 import pytest
 import numpy as np
 
+from skml.multi import DataProcessor
+
 
 def test_suite_binary_search():
     arr = [1, 2, 3, 4, 5, 6]
@@ -103,7 +105,7 @@ def test_suite_drop_records():
     with pytest.raises(ValueError):
         utils.drop_records(X=[], y=y, attribute_index=1, value=4)
     with pytest.raises(ValueError):
-        utils.drop_records(X=X, y=[0,0], attribute_index=1, value=2)
+        utils.drop_records(X=X, y=[0, 0], attribute_index=1, value=2)
     with pytest.raises(ValueError):
         utils.drop_records(X=[[1, 2, 3], [4, 2, 3]], y=[0, 0, 1], attribute_index=1, value=2)
 
@@ -122,7 +124,6 @@ def test_suite_create_attribute_node():
     attribute_value = 2
     curr_node_index = 1
     prev_node_index = 0
-
 
     attribute_node = utils.create_attribute_node(partial_X=X,
                                                  partial_y=y,
@@ -192,8 +193,8 @@ def test_suite_convert_numeric_values():
     with pytest.raises(AttributeError):
         utils.convert_numeric_values(chosen_split_points=None, chosen_attribute=chosen_attribute, partial_X=X)
     with pytest.raises(TypeError):
-        utils.convert_numeric_values(chosen_split_points=chosen_split_points, chosen_attribute=chosen_attribute, partial_X=None)
-
+        utils.convert_numeric_values(chosen_split_points=chosen_split_points, chosen_attribute=chosen_attribute,
+                                     partial_X=None)
 
 
 def test_suite_calculate_second_best_attribute_of_last_layer():
@@ -222,6 +223,22 @@ def test_suite_calculate_second_best_attribute_of_last_layer():
     assert mi == 0
 
 
+def test_suite_get_column_type():
+    path = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit.csv"
+    dp = DataProcessor()
+    x_train, x_test, y_train, y_test = dp.convert(path, 0.3)
+
+    columns_type = utils.get_columns_type(X=x_train)
+
+    expected_columns_type = ['category', 'float64', 'float64', 'category', 'int64', 'category', 'float64', 'category',
+                             'category', 'int64', 'category', 'category', 'int64', 'int64']
+
+    assert np.array_equal(columns_type, expected_columns_type)
+
+    with pytest.raises(AttributeError):
+        utils.get_columns_type(X=None)
+
+
 test_suite_binary_search()
 test_suite_split_data_to_two_intervals()
 test_suite_find_split_position()
@@ -229,3 +246,4 @@ test_suite_drop_records()
 test_suite_create_attribute_node()
 test_suite_convert_numeric_values()
 test_suite_calculate_second_best_attribute_of_last_layer()
+test_suite_get_column_type()
