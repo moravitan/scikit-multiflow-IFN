@@ -50,14 +50,9 @@ class BasicIncremental(IncrementalOnlineNetwork):
 
             else:  # cold start
                 print("***Cold Start***")
-                X_batch_df = pd.DataFrame(X_batch)
-                self.classifier.fit(X_batch_df, y_batch)
+                self._induce_new_model(training_window_X=X_batch, training_window_y=y_batch)
                 j = j + self.window
-                # save the model
-                path = self.path + "/" + str(self.counter) + ".pickle"
-                pickle.dump(self.classifier, open(path, "wb"))
                 print("### Model " + str(self.counter) + " saved ###")
-                self.counter = self.counter + 1
 
             j = j + self.window
             X_batch.clear()
