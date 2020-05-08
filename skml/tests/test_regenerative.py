@@ -20,7 +20,7 @@ def _clean_test_env():
 def test_OLIN():
     _setup_test_env()
     ifn = IfnClassifier(alpha)
-    regenerative = OnlineNetworkRegenerative(ifn, test_tmp_folder, n_min=0, n_max=60, Pe=0.7)
+    regenerative = OnlineNetworkRegenerative(ifn, test_tmp_folder, n_min=0, n_max=1000, Pe=0.7)
     regenerative.generate()
     _clean_test_env()
 

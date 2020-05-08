@@ -18,6 +18,7 @@ class BasicIncremental(IncrementalOnlineNetwork):
     def generate(self):
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
+        print("Window size is: " + str(self.window))
         i = self.n_min - self.window
         j = self.window
         add_count = self.init_add_count
@@ -25,7 +26,7 @@ class BasicIncremental(IncrementalOnlineNetwork):
         y_batch = []
 
         while j < self.n_max:
-
+            print("Buffering training sample window from SEA Generator")
             while i < j:
                 X, y = self.data_stream_generator.next_sample()
                 X_batch.append(X[0])
@@ -37,7 +38,7 @@ class BasicIncremental(IncrementalOnlineNetwork):
                 k = j + add_count
                 X_validation_samples = []
                 y_validation_samples = []
-
+                print("Buffering validation sample window from SEA Generator")
                 while j < k:
                     X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
                     X_validation_samples.append(X_validation_sample[0])
@@ -48,12 +49,14 @@ class BasicIncremental(IncrementalOnlineNetwork):
                 i = j - self.window
 
             else:  # cold start
+                print("***Cold Start***")
                 X_batch_df = pd.DataFrame(X_batch)
                 self.classifier.fit(X_batch_df, y_batch)
                 j = j + self.window
                 # save the model
                 path = self.path + "/" + str(self.counter) + ".pickle"
                 pickle.dump(self.classifier, open(path, "wb"))
+                print("### Model " + str(self.counter) + " saved ###")
                 self.counter = self.counter + 1
 
             j = j + self.window
@@ -61,6 +64,7 @@ class BasicIncremental(IncrementalOnlineNetwork):
             y_batch.clear()
 
         last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
+        print("Model path is: " + self.path + "/" + str(self.counter - 1))
         return last_model
 
     def _incremental_IN(self,
@@ -73,16 +77,21 @@ class BasicIncremental(IncrementalOnlineNetwork):
         Etr = self.classifier.calculate_error_rate(X=training_window_X,
                                                    y=training_window_y)
 
+        print("Current model training error rate for the current window of samples: " + str(Etr))
         Eval = self.classifier.calculate_error_rate(X=validation_window_X,
                                                     y=validation_window_y)
-
+        print("Current model validation error rate for the current window of samples: " + str(Eval))
         max_diff = self.meta_learning.get_max_diff(Etr=Etr,
                                                    Eval=Eval,
                                                    add_count=add_count)
 
         if abs(Eval - Etr) < max_diff:  # concept is stable
+            print("###Concept is stable###")
+            print("###Updating the current model###")
             self._update_current_network(training_window_X=training_window_X,
                                          training_window_y=training_window_y)
         else:  # concept drift detected
+            print("***Concept drift detected***")
+            print("***Generating new model***")
             self._induce_new_model(training_window_X=training_window_X,
                                    training_window_y=training_window_y)
