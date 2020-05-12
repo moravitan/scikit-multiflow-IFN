@@ -80,6 +80,7 @@ class OnlineNetworkRegenerative():
         """
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
+        self.classifier.window_size = self.window
         print("Window size is: " + str(self.window))
         i = 0
         j = self.window
@@ -95,10 +96,10 @@ class OnlineNetworkRegenerative():
                 y_batch.append(y[0])
                 i = i + 1
 
-            X_batch_df = pd.DataFrame(X_batch)
-            if X_batch_df is None or X_batch_df.size == 0:
+            if len(X_batch) == 0:
                 break
-            self.classifier.fit(X_batch_df, y_batch)
+
+            self.classifier.partial_fit(X_batch, y_batch)
             Etr = self.classifier.calculate_error_rate(X_batch, y_batch)
             print("Current model training error rate for the current window of samples: " + str(Etr))
             k = j + add_count

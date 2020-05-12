@@ -4,6 +4,7 @@ Original code and method by: Prof' Mark Last
 License: BSD 3 clause
 """
 import numpy as np
+import pandas as pd
 from ._ifn_network import IfnNetwork, HiddenLayer
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from skml import utils
@@ -29,10 +30,14 @@ class IfnClassifier():
         The maximum number of layers the network will have.
     """
 
-    def __init__(self, alpha=0.99, max_number_of_layers=math.inf):
+    def __init__(self, alpha=0.99, max_number_of_layers=math.inf, window_size=100):
         if 0 <= alpha < 1:
             self.alpha = alpha
             self.max_number_of_layers = max_number_of_layers
+            self.window_size = window_size
+            self.X_batch = []
+            self.y_batch = []
+            self.i = 0
             self.is_fitted = False
             self.training_error = 0
             self.cmi_sec_best_att = 0
@@ -920,5 +925,43 @@ class IfnClassifier():
 
         # return 1 - self.score(X=X, y=y, sample_weight=None)
 
-    def partial_fit(self, X, y, classes=None, sample_weight=None):
-        raise NotImplementedError()
+    def partial_fit(self, X, y=None, classes=None, sample_weight=None):
+        """ Partially (incrementally) fit the model.
+
+        Parameters
+        ----------
+        X : numpy.ndarray of shape (n_samples, n_features)
+            The features to train the model.
+
+        y: numpy.ndarray of shape (n_samples)
+            An array-like with the labels of all samples in X.
+
+        classes: Not used (default=None)
+
+        sample_weight: numpy.ndarray of shape (n_samples), optional (default=None)
+            Samples weight. If not provided, uniform weights are assumed.
+
+        Returns
+        -------
+            self
+
+        """
+        N, D = X.shape
+
+        for n in range(N):
+            # For each instance ...
+            self.X_batch.append(X[n])
+            self.y_batch.append(y[n])
+            # self.sample_weight[self.i] = sample_weight[n] if sample_weight else 1.0
+            self.i = self.i + 1
+
+            if self.i == self.window_size:
+                # Train it
+                X_batch_df = pd.DataFrame(self.X_batch)
+                self.fit(X=X_batch_df, y=self.y_batch,classes=classes, sample_weight=sample_weight)
+                # Reset the window
+                self.i = 0
+                self.X_batch.clear()
+                self.y_batch.clear()
+
+        return self

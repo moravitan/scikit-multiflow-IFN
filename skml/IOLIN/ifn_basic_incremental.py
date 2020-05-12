@@ -18,6 +18,7 @@ class BasicIncremental(IncrementalOnlineNetwork):
     def generate(self):
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
+        self.classifier.window_size = self.window
         print("Window size is: " + str(self.window))
         i = self.n_min - self.window
         j = self.window

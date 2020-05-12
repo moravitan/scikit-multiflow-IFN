@@ -63,6 +63,7 @@ class IncrementalOnlineNetwork(ABC):
         """
 
         self.classifier = classifier
+
         self.path = path
         self.number_of_classes = number_of_classes
         self.n_min = n_min
@@ -419,8 +420,8 @@ class IncrementalOnlineNetwork(ABC):
         training_window_y: array-like, shape = [n_samples]
             The target values of the new samples in the new window.
         """
-        training_window_X_df = pd.DataFrame(training_window_X)
-        self.classifier = self.classifier.fit(training_window_X_df, training_window_y)
+        # training_window_X_df = pd.DataFrame(training_window_X)
+        self.classifier = self.classifier.partial_fit(training_window_X, training_window_y)
         path = self.path + "/" + str(self.counter) + ".pickle"
         pickle.dump(self.classifier, open(path, "wb"))
         self.counter = self.counter + 1
