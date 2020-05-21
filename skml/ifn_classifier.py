@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from ._ifn_network import IfnNetwork, HiddenLayer
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from skmultiflow.core import BaseSKMObject, ClassifierMixin
 from skml import utils
 from scipy import stats
 import math
@@ -15,7 +16,7 @@ import time
 import sys
 
 
-class IfnClassifier():
+class IfnClassifier(BaseSKMObject, ClassifierMixin):
     """ A template estimator to be used as a reference implementation.
 
     For more information regarding how to build your own estimator, read more
@@ -129,16 +130,16 @@ class IfnClassifier():
             chosen_split_points = []
             if current_layer is not None:
                 global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
-                    self.choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                columns_type=columns_type,
-                                                nodes=current_layer.get_nodes())
+                    self._choose_split_attribute(attributes_indexes=attributes_indexes,
+                                                 columns_type=columns_type,
+                                                 nodes=current_layer.get_nodes())
             # first layer
             else:
                 global_chosen_attribute, attributes_mi, not_relevant = \
-                    self.choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                columns_type=columns_type,
-                                                X=X,
-                                                y=y)
+                    self._choose_split_attribute(attributes_indexes=attributes_indexes,
+                                                 columns_type=columns_type,
+                                                 X=X,
+                                                 y=y)
 
             # there isn't an attribute to split the network by
             if global_chosen_attribute == -1:
@@ -227,7 +228,7 @@ class IfnClassifier():
 
             # Set the un significant node as terminal nodes
             insignificant_nodes_set = list(set(insignificant_nodes))
-            self.set_terminal_nodes(insignificant_nodes_set, self.class_count)
+            self._set_terminal_nodes(insignificant_nodes_set, self.class_count)
 
             current_layer = next_layer
             number_of_layers += 1
@@ -249,8 +250,8 @@ class IfnClassifier():
 
         # Network building is done
         # Set the remaining nodes as terminals
-        self.set_terminal_nodes(nodes=current_layer.get_nodes(),
-                                class_count=self.class_count)
+        self._set_terminal_nodes(nodes=current_layer.get_nodes(),
+                                 class_count=self.class_count)
 
         with open('output.txt', 'a') as f:
             f.write('Total nodes created:' + str(curr_node_index) + "\n")
@@ -271,6 +272,50 @@ class IfnClassifier():
         self.split_points.clear()
         self.nodes_splitted_per_attribute.clear()
         significant_attributes_per_node.clear()
+
+        return self
+
+    def partial_fit(self, X, y=None, classes=None, sample_weight=None):
+        """ Partially (incrementally) fit the model.
+
+        Parameters
+        ----------
+        X : numpy.ndarray of shape (n_samples, n_features)
+            The features to train the model.
+
+        y: numpy.ndarray of shape (n_samples)
+            An array-like with the labels of all samples in X.
+
+        classes: Not used (default=None)
+
+        sample_weight: numpy.ndarray of shape (n_samples), optional (default=None)
+            Samples weight. If not provided, uniform weights are assumed.
+
+        Returns
+        -------
+            self
+
+        """
+        N, D = X.shape
+
+        for n in range(N):
+            # For each instance ...
+            self.X_batch.append(X[n])
+            self.y_batch.append(y[n])
+            # self.sample_weight[self.i] = sample_weight[n] if sample_weight else 1.0
+            self.i = self.i + 1
+
+            if self.i == self.window_size:
+                # Train it
+                X_batch_df = pd.DataFrame(self.X_batch)
+                self.fit(X=X_batch_df, y=self.y_batch,classes=classes, sample_weight=sample_weight)
+                # Reset the window
+                self.i = 0
+                self.X_batch.clear()
+                self.y_batch.clear()
+
+        if not self.is_fitted:
+            print("There are not enough samples to build a network")
 
         return self
 
@@ -373,7 +418,7 @@ class IfnClassifier():
 
         return np.array(predicted)
 
-    def choose_split_attribute(self, attributes_indexes, columns_type, nodes=None, X=None, y=None):
+    def _choose_split_attribute(self, attributes_indexes, columns_type, nodes=None, X=None, y=None):
         """ Returns the most significant attribute upon all.
             The mose significant attribute is the one hold the higher conditional mutual information.
 
@@ -469,7 +514,7 @@ class IfnClassifier():
         attribute_data = list(X[:, attribute_index])
         self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
 
-        mutual_info_score = self.calculate_conditional_mutual_information(attribute_data, y)
+        mutual_info_score = self._calculate_conditional_mutual_information(attribute_data, y)
         statistic = 2 * np.log(2) * self.total_records * mutual_info_score
         critical = stats.chi2.ppf(self.alpha, ((self.num_of_classes - 1) *
                                                ((len(self.unique_values_per_attribute[attribute_index])) - 1)))
@@ -722,12 +767,12 @@ class IfnClassifier():
             rel_num_of_classes = len(np.unique(np.array(y)))
             critical = stats.chi2.ppf(self.alpha, (rel_num_of_classes - 1))
 
-        t_mi = self.calculate_conditional_mutual_information(X=X, y=y)
+        t_mi = self._calculate_conditional_mutual_information(X=X, y=y)
         statistic = 2 * np.log(2) * self.total_records * t_mi
 
         return statistic, critical, t_mi
 
-    def calculate_conditional_mutual_information(self, X, y):
+    def _calculate_conditional_mutual_information(self, X, y):
         """ Calculate the conditional mutual information of the feature given in x.
 
         Parameters
@@ -892,7 +937,7 @@ class IfnClassifier():
                 record[chosen_attribute] = utils.find_split_position(value=record[chosen_attribute],
                                                                      positions=chosen_split_points)
 
-    def set_terminal_nodes(self, nodes, class_count):
+    def _set_terminal_nodes(self, nodes, class_count):
         """ Connecting the given nodes to the terminal nodes in the network.
 
         Parameters
@@ -914,58 +959,5 @@ class IfnClassifier():
 
     def calculate_error_rate(self, X, y):
 
-        correct = 0
-        for i in range(len(y)):
-            predicted_value = self.predict([X[i]])[0]
-            # predicted_value = self.predict(X.iloc[[i]])[0]
-            if predicted_value == y[i]:
-                correct += 1
+        return 1 - self.score(X=X, y=y, sample_weight=None)
 
-        error_rate = (len(y) - correct) / len(y)
-        return error_rate
-
-        # return 1 - self.score(X=X, y=y, sample_weight=None)
-
-    def partial_fit(self, X, y=None, classes=None, sample_weight=None):
-        """ Partially (incrementally) fit the model.
-
-        Parameters
-        ----------
-        X : numpy.ndarray of shape (n_samples, n_features)
-            The features to train the model.
-
-        y: numpy.ndarray of shape (n_samples)
-            An array-like with the labels of all samples in X.
-
-        classes: Not used (default=None)
-
-        sample_weight: numpy.ndarray of shape (n_samples), optional (default=None)
-            Samples weight. If not provided, uniform weights are assumed.
-
-        Returns
-        -------
-            self
-
-        """
-        N, D = X.shape
-
-        for n in range(N):
-            # For each instance ...
-            self.X_batch.append(X[n])
-            self.y_batch.append(y[n])
-            # self.sample_weight[self.i] = sample_weight[n] if sample_weight else 1.0
-            self.i = self.i + 1
-
-            if self.i == self.window_size:
-                # Train it
-                X_batch_df = pd.DataFrame(self.X_batch)
-                self.fit(X=X_batch_df, y=self.y_batch,classes=classes, sample_weight=sample_weight)
-                # Reset the window
-                self.i = 0
-                self.X_batch.clear()
-                self.y_batch.clear()
-
-        if not self.is_fitted:
-            print("There are not enough samples to build a network")
-
-        return self
