@@ -61,6 +61,7 @@ class PureMultiple(IncrementalOnlineNetwork):
         """
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
+        self.classifier.window_size = self.window
         i = 0
         j = self.window
         add_count = self.init_add_count

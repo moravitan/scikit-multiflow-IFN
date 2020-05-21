@@ -994,3 +994,9 @@ class IfnClassifierMulti():
 
         error_rate = (np.size(y, 0) * np.size(y, 1) - correct) / (np.size(y, 0) * np.size(y, 1))
         return error_rate
+
+        # from sklearn.metrics import accuracy_score
+        # return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
+
+    def partial_fit(self, X, y=None, classes=None, sample_weight=None):
+        pass
