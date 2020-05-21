@@ -83,6 +83,7 @@ class IfnClassifier():
         -------
             self
         """
+        self.is_fitted = False
         start = time.time()
         print('Building the network...')
 
@@ -963,5 +964,8 @@ class IfnClassifier():
                 self.i = 0
                 self.X_batch.clear()
                 self.y_batch.clear()
+
+        if not self.is_fitted:
+            print("There are not enough samples to build a network")
 
         return self
