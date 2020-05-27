@@ -1,5 +1,3 @@
-import os
-import shutil
 from skml.IOLIN import OnlineNetworkRegenerative
 from skml import IfnClassifier
 

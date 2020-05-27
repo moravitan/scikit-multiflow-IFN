@@ -108,5 +108,6 @@ class PureMultiple(IncrementalOnlineNetwork):
 
             j = j + self.window
 
-        last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
+        full_path = os.path.join(self.path, str(self.counter - 1))
+        last_model = pickle.load(open(full_path + ".pickle", "rb"))
         return last_model

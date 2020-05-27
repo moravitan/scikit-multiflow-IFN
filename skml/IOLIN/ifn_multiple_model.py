@@ -75,6 +75,8 @@ class MultipleModel(IncrementalOnlineNetwork):
                 self._induce_new_model(training_window_X=X_batch, training_window_y=y_batch)
 
             X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample(add_count)
+            j = j + add_count
+
 
             Etr = self.classifier.calculate_error_rate(X=X_batch,
                                                        y=y_batch)
