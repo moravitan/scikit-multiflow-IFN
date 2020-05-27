@@ -2,6 +2,7 @@ import math
 import pandas as pd
 import numpy as np
 from scipy import stats
+import os
 import copy
 import pickle
 from abc import ABC, abstractmethod
@@ -423,8 +424,9 @@ class IncrementalOnlineNetwork(ABC):
         """
         # training_window_X_df = pd.DataFrame(training_window_X)
         self.classifier = self.classifier.partial_fit(training_window_X, training_window_y)
-        path = self.path + "/" + str(self.counter) + ".pickle"
-        pickle.dump(self.classifier, open(path, "wb"))
+        path = str(self.counter) + ".pickle"
+        full_path = os.path.join(self.path, path)
+        pickle.dump(self.classifier, open(full_path, "wb"))
         self.counter = self.counter + 1
 
     @staticmethod

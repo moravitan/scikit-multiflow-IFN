@@ -1,7 +1,7 @@
 import math
 import pickle
 import pandas as pd
-
+import os
 from skmultiflow.data import SEAGenerator
 from skml.IOLIN import IncrementalOnlineNetwork
 
@@ -46,8 +46,9 @@ class BasicIncremental(IncrementalOnlineNetwork):
 
             j = j + self.window
 
-        last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
-        print("Model path is: " + self.path + "/" + str(self.counter - 1))
+        full_path = os.path.join(self.path, str(self.counter - 1))
+        last_model = pickle.load(open(full_path + ".pickle", "rb"))
+        print("Model path is: " + str(self.path) + "/" + str(self.counter - 1))
         return last_model
 
     def _incremental_IN(self,

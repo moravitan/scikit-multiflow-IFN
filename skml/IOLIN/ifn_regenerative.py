@@ -1,6 +1,7 @@
 import math
 import pickle
 import numpy as np
+import os
 from skmultiflow.data import SEAGenerator
 from skml.IOLIN import MetaLearning
 
@@ -120,11 +121,12 @@ class OnlineNetworkRegenerative():
                 j = j + self.window
                 add_count = max(add_count * (1 - (self.red_add_count / 100)), self.min_add_count)
 
-            path = self.path + "/" + str(self.counter) + ".pickle"
-            pickle.dump(self.classifier, open(path, "wb"))
+            full_path = os.path.join(self.path, str(self.counter))
+            pickle.dump(self.classifier, open(full_path + ".pickle", "wb"))
             print("### Model " + str(self.counter) + " saved ###")
             self.counter = self.counter + 1
 
-        last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
+        full_path = os.path.join(self.path, str(self.counter - 1))
+        last_model = pickle.load(open(full_path + ".pickle", "rb"))
         print("Model path is: " + self.path + "/" + str(self.counter - 1))
         return last_model

@@ -297,6 +297,7 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
 
         """
         N, D = X.shape
+        isEnoughSamples = False
 
         for n in range(N):
             # For each instance ...
@@ -306,6 +307,7 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
             self.i = self.i + 1
 
             if self.i == self.window_size:
+                isEnoughSamples = True
                 # Train it
                 X_batch_df = pd.DataFrame(self.X_batch)
                 self.fit(X=X_batch_df, y=self.y_batch,classes=classes, sample_weight=sample_weight)
@@ -314,8 +316,8 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
                 self.X_batch.clear()
                 self.y_batch.clear()
 
-        if not self.is_fitted:
-            print("There are not enough samples to build a network")
+        # if not isEnoughSamples:
+        #     print("There are not enough samples to build a network")
 
         return self
 
@@ -585,7 +587,7 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
 
     def _discretization(self, attribute_index, interval, total_mi=0, nodes=None, prev_split_points=None):
         """ A recursive implementation of a discretization of the IFN algorithm according to the algorithm
-            published in -- TODO: *** ADD A LINK***
+            published in "Maimon, Oded, and Mark Last. "Knowledge discovery and data mining." Klewer Pub. Co (2001)."
 
 
         Parameters
@@ -643,13 +645,11 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
                                                                             T=T,
                                                                             min_value=min_value,
                                                                             max_value=max_value)
-
                 if len(np.unique(t_attribute_date)) != 2:
                     break
 
                 statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
                                                                                                 y=new_y)
-
                 # T in attribute is a possible split point
                 if critical < statistic:
                     # For each point save it's mutual information
@@ -885,6 +885,7 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
             is_continuous = 'category' not in columns_type[attribute_index]
             if is_continuous:
                 attribute_data = list(X[:, attribute_index])
+                # attribute_data = [round(num, 2) for num in attribute_data]
                 self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
                 data_class_array = list(zip(attribute_data, y))
                 data_class_array.sort(key=lambda tup: tup[0])
