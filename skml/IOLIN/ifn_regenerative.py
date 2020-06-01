@@ -80,12 +80,10 @@ class OnlineNetworkRegenerative():
 
         self.window = self.meta_learning.calculate_Wint(self.Pe)
         self.classifier.window_size = self.window
-        print("Window size is: " + str(self.window))
         j = self.window
         add_count = self.init_add_count
 
         while j < self.n_max:
-            print("Buffering training sample window from SEA Generator")
 
             X_batch, y_batch = self.data_stream_generator.next_sample(self.window)
 
@@ -94,9 +92,7 @@ class OnlineNetworkRegenerative():
 
             self.classifier.partial_fit(X_batch, y_batch)
             Etr = self.classifier.calculate_error_rate(X_batch, y_batch)
-            print("Current model training error rate for the current window of samples: " + str(Etr))
 
-            print("Buffering validation sample window from SEA Generator")
             X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample(int(add_count))
             j = j + add_count
 
@@ -104,29 +100,23 @@ class OnlineNetworkRegenerative():
             max_diff = self.meta_learning.get_max_diff(Etr, Eval, add_count)
 
             if abs(Eval - Etr) < max_diff:  # concept is stable
-                print("Concept is stable")
                 add_count = min(add_count * (1 + (self.inc_add_count / 100)), self.max_add_count)
                 self.window = min(self.window + add_count, self.max_window)
                 self.meta_learning.window = self.window
                 j = j + self.window
 
             else:  # concept drift detected
-                print("***Concept drift detected***")
-                print("Calculating new window size")
                 unique, counts = np.unique(np.array(y_batch), return_counts=True)
                 target_distribution = counts[0] / len(y_batch)
                 NI = len(self.classifier.network.root_node.first_layer.nodes)
                 self.window = self.meta_learning.calculate_new_window(NI, target_distribution, Etr)
-                print("New window size is: " + str(self.window))
                 j = j + self.window
                 add_count = max(add_count * (1 - (self.red_add_count / 100)), self.min_add_count)
 
             full_path = os.path.join(self.path, str(self.counter))
             pickle.dump(self.classifier, open(full_path + ".pickle", "wb"))
-            print("### Model " + str(self.counter) + " saved ###")
             self.counter = self.counter + 1
 
         full_path = os.path.join(self.path, str(self.counter - 1))
         last_model = pickle.load(open(full_path + ".pickle", "rb"))
-        print("Model path is: " + self.path + "/" + str(self.counter - 1))
         return last_model
