@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 from skml.multi.ifn_classifier_multi import IfnClassifierMulti
 from skml.multi._data_processing_multi import DataProcessor
+from skmultiflow.data import RandomTreeGenerator
 import pytest
 import os
 import filecmp
@@ -66,5 +67,16 @@ def test__model_pickle_const_dataset(path, multi_label=False):
     _clean_test_env()
 
 
-test__model_pickle_const_dataset(dataset_path_1, True)
-test__model_pickle_const_dataset(dataset_path_2)
+# test__model_pickle_const_dataset(dataset_path_1, True)
+# test__model_pickle_const_dataset(dataset_path_2)
+
+# def test_partial_fit():
+#     stream = RandomTreeGenerator(tree_random_state=1, sample_random_state=1)
+#     stream.prepare_for_use()
+#     clf = IfnClassifierMulti(alpha=0.99, multi_label=False, window_size=100)
+#     for i in range(0, 10):
+#         X, y = stream.next_sample(10)
+#         clf.partial_fit(X, y)
+#
+#
+# test_partial_fit()

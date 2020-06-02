@@ -62,8 +62,13 @@ class IfnClassifierMulti():
         The maximum number of layers the network will have.
     """
 
-    def __init__(self, alpha=0.99, multi_label=False, max_number_of_layers=math.inf):
+    def __init__(self, alpha=0.99, multi_label=False, max_number_of_layers=math.inf, window_size=100):
         if 0 <= alpha < 1:
+            self.max_number_of_layers = max_number_of_layers
+            self.window_size = window_size
+            self.X_batch = []
+            self.y_batch = []
+            self.i = 0
             self.alpha = alpha
             self.max_number_of_layers = max_number_of_layers
             self.total_records = 0
@@ -101,7 +106,7 @@ class IfnClassifierMulti():
     #     if len(np.unique(X)) == 2:
     #         return False
 
-    def fit(self, X, y, sample_weight=None):
+    def fit(self, X, y, classes=None, sample_weight=None):
         """A reference implementation of a fitting function.
 
         Parameters
@@ -110,7 +115,11 @@ class IfnClassifierMulti():
             The training input samples upon which the transforms/estimator will create their model.
         y : {array-like, sparse matrix}, shape (n_samples, y_classes)
             The targets values.
-
+        classes: numpy.array
+            Contains the class values in the stream. If defined, will be used
+            to define the length of the arrays returned by `predict_proba`
+        sample_weight: float or array-like
+            Samples weight. If not provided, uniform weights are assumed.
         Returns
         -------
             self
@@ -999,4 +1008,45 @@ class IfnClassifierMulti():
         # return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
 
     def partial_fit(self, X, y=None, classes=None, sample_weight=None):
-        pass
+        """ Partially (incrementally) fit the model.
+
+        Parameters
+        ----------
+        X : numpy.ndarray of shape (n_samples, n_features)
+            The features to train the model.
+
+        y: {array-like, sparse matrix}, shape (n_samples, y_classes)
+            Contains the true class labels for all the samples in X.
+
+        classes: Not used (default=None)
+
+        sample_weight: numpy.ndarray of shape (n_samples), optional (default=None)
+            Samples weight. If not provided, uniform weights are assumed.
+
+        Returns
+        -------
+            self
+
+        """
+        N, D = X.shape
+
+        for n in range(N):
+            # For each instance ...
+            self.X_batch.append(X[n])
+            self.y_batch.append(y[n])
+            # self.sample_weight[self.i] = sample_weight[n] if sample_weight else 1.0
+            self.i = self.i + 1
+            if self.i == self.window_size:
+                # Train it
+                X_batch_df = pd.DataFrame(self.X_batch)
+                self.fit(X=X_batch_df, y=self.y_batch, classes=classes, sample_weight=sample_weight)
+                # Reset the window
+                self.i = 0
+                self.X_batch.clear()
+                self.y_batch.clear()
+
+        if not self.is_fitted_:
+            print("There are not enough samples to build a network")
+
+        return self
+
