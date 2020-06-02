@@ -913,7 +913,6 @@ class IfnClassifier():
                                                                      class_count=class_count))
 
     def calculate_error_rate(self, X, y):
-
         correct = 0
         for i in range(len(y)):
             predicted_value = self.predict([X[i]])[0]
@@ -959,7 +958,7 @@ class IfnClassifier():
             if self.i == self.window_size:
                 # Train it
                 X_batch_df = pd.DataFrame(self.X_batch)
-                self.fit(X=X_batch_df, y=self.y_batch,classes=classes, sample_weight=sample_weight)
+                self.fit(X=X_batch_df, y=self.y_batch, classes=classes, sample_weight=sample_weight)
                 # Reset the window
                 self.i = 0
                 self.X_batch.clear()

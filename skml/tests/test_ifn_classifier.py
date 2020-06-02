@@ -72,7 +72,7 @@ def test__model_pickle_const_dataset():
 def test_partial_fit():
     stream = RandomTreeGenerator(tree_random_state=1, sample_random_state=1)
     clf = IfnClassifier(alpha=0.99, window_size=100)
-    for i in range (0,10):
+    for i in range(0, 10):
         X, y = stream.next_sample(10)
         clf.partial_fit(X, y)
 
