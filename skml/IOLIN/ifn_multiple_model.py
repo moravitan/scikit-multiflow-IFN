@@ -66,29 +66,17 @@ class MultipleModel(IncrementalOnlineNetwork):
         i = 0
         j = self.window
         add_count = self.init_add_count
-        X_batch = []
-        y_batch = []
 
         while j < self.n_max:
 
-            while i < j:
-                X, y = self.data_stream_generator.next_sample()
-                X_batch.append(X[0])
-                y_batch.append(y[0])
-                i = i + 1
+            X_batch, y_batch = self.data_stream_generator.next_sample(self.window)
 
             if not self.classifier.is_fitted:  # cold start
                 self._induce_new_model(training_window_X=X_batch, training_window_y=y_batch)
 
-            k = j + add_count
-            X_validation_samples = []
-            y_validation_samples = []
+            X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample(add_count)
+            j = j + add_count
 
-            while j < k:
-                X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
-                X_validation_samples.append(X_validation_sample[0])
-                y_validation_samples.append(y_validation_sample[0])
-                j = j + 1
 
             Etr = self.classifier.calculate_error_rate(X=X_batch,
                                                        y=y_batch)
@@ -111,7 +99,8 @@ class MultipleModel(IncrementalOnlineNetwork):
                 generated_classifiers = {}
 
                 for classifier in classifier_files_names:
-                    generated_clf = pickle.load(open(self.path + "/" + classifier, "rb"))
+                    full_path = os.path.join(self.path, classifier)
+                    generated_clf = pickle.load(open(full_path, "rb"))
                     # Entropy of target attribute on a former window
                     target_distribution_former = generated_clf.class_count[0][1] / len(y_batch)
                     E_former = stats.entropy([target_distribution_former, 1 - target_distribution_former], base=2)
@@ -119,22 +108,15 @@ class MultipleModel(IncrementalOnlineNetwork):
 
                 # Choose network with min |E_current(T)–E_former(T)|
                 chosen_classifier_name = min(generated_classifiers, key=generated_classifiers.get)
-                chosen_classifier = pickle.load(open(self.path + "/" + chosen_classifier_name, "rb"))
+                full_path = os.path.join(self.path, chosen_classifier_name)
+                chosen_classifier = pickle.load(open(full_path, "rb"))
 
                 self.classifier = chosen_classifier
                 self._new_split_process(training_window_X=X_batch)  # add new layer if possible
 
                 # test the new chosen network on a new validation window
-                k = j + add_count
-                i = k
-                X_validation_samples = []
-                y_validation_samples = []
-
-                while j < k:
-                    X_validation_sample, y_validation_sample = self.data_stream_generator.next_sample()
-                    X_validation_samples.append(X_validation_sample[0])
-                    y_validation_samples.append(y_validation_sample[0])
-                    j = j + 1
+                X_validation_samples, y_validation_samples = self.data_stream_generator.next_sample(add_count)
+                j = j + add_count
 
                 # error rate of the new chosen classifier on the new window
                 Etr = self.classifier.calculate_error_rate(X=X_batch,
@@ -155,8 +137,7 @@ class MultipleModel(IncrementalOnlineNetwork):
                     self._induce_new_model(training_window_X=X_batch, training_window_y=y_batch)
 
             j = j + self.window
-            X_batch.clear()
-            y_batch.clear()
 
-        last_model = pickle.load(open(self.path + "/" + str(self.counter - 1) + ".pickle", "rb"))
+        full_path = os.path.join(self.path, str(self.counter - 1))
+        last_model = pickle.load(open(full_path + ".pickle", "rb"))
         return last_model

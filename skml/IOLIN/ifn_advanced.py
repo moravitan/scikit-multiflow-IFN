@@ -81,8 +81,8 @@ class Advanced(IncrementalOnlineNetwork):
             layer_nodes = curr_layer.get_nodes()
             total_mi = 0
             for node in layer_nodes:
-                node_mi = self.classifier.calculate_conditional_mutual_information(X=node.partial_x,
-                                                                                   y=node.partial_y)
+                node_mi = self.classifier._calculate_conditional_mutual_information(X=node.partial_x,
+                                                                                    y=node.partial_y)
                 total_mi += node_mi
 
             curr_layer.mutual_information = total_mi

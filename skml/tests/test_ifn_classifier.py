@@ -10,7 +10,8 @@ import filecmp
 import numpy as np
 import shutil
 
-dataset_path = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit.csv"
+# dataset_path = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow\src\skmultiflow\data\datasets\elec.csv"
+dataset_path = r"C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\tests\datasets\Credit.csv"
 test_size_percentage = 0.3
 alpha = 0.99
 test_tmp_folder = "tmp"
@@ -70,12 +71,44 @@ def test__model_pickle_const_dataset():
 
 
 def test_partial_fit():
-    stream = RandomTreeGenerator(tree_random_state=1, sample_random_state=1)
-    clf = IfnClassifier(alpha=0.99, window_size=100)
-    for i in range(0, 10):
-        X, y = stream.next_sample(10)
-        clf.partial_fit(X, y)
+    stream = RandomTreeGenerator(tree_random_state=112, sample_random_state=112)
+
+    estimator = IfnClassifier(alpha)
+
+    X, y = stream.next_sample(150)
+    estimator.partial_fit(X, y)
+
+    cnt = 0
+    max_samples = 3000
+    predictions = []
+    true_labels = []
+    wait_samples = 100
+    correct_predictions = 0
+
+    while cnt < max_samples:
+        X, y = stream.next_sample()
+        # Test every n samples
+        if (cnt % wait_samples == 0) and (cnt != 0):
+            predictions.append(estimator.predict(X)[0])
+            true_labels.append(y[0])
+            if np.array_equal(y[0], predictions[-1]):
+                correct_predictions += 1
+
+        estimator.partial_fit(X, y)
+        cnt += 1
+
+    performance = correct_predictions / len(predictions)
+    expected_predictions = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+                            0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+                            1.0, 1.0, 1.0]
+
+    expected_correct_predictions = 20
+    expected_performance = 0.6896551724137931
+
+    assert np.alltrue(predictions == expected_predictions)
+    assert np.isclose(expected_performance, performance)
+    assert correct_predictions == expected_correct_predictions
 
 
-# test__model_pickle_const_dataset()
-test_partial_fit()
+test__model_pickle_const_dataset()
+# test_partial_fit()
