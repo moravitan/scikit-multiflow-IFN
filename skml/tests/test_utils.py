@@ -2,7 +2,7 @@ from skml import utils
 import pytest
 import numpy as np
 
-from skml.multi import DataProcessor
+from skml.multi import DataProcessorMulti
 
 
 def test_suite_binary_search():
@@ -225,7 +225,7 @@ def test_suite_calculate_second_best_attribute_of_last_layer():
 
 def test_suite_get_column_type():
     path = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit.csv"
-    dp = DataProcessor()
+    dp = DataProcessorMulti()
     x_train, x_test, y_train, y_test = dp.convert(path, 0.3)
 
     columns_type = utils.get_columns_type(X=x_train)

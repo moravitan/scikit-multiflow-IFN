@@ -10,7 +10,7 @@ from skmultiflow.data import SEAGenerator
 from sklearn.utils.validation import check_X_y
 from skml.IOLIN import MetaLearning
 import skml.utils as Utils
-from skml._ifn_network import HiddenLayer
+from skml.ifn_network import HiddenLayer
 
 
 class IncrementalOnlineNetwork(ABC):

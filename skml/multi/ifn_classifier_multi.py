@@ -4,7 +4,7 @@ Original code and method by: Prof' Mark Last
 License: BSD 3 clause
 """
 import numpy as np
-from ._ifn_network_multi import IfnNetwork, AttributeNode, HiddenLayer
+from .ifn_network_multi import IfnNetworkMulti, HiddenLayer
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from skml import utils
 from scipy import stats
@@ -100,7 +100,7 @@ class IfnClassifierMulti():
             self.y_cols = []
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
-        self.network = IfnNetwork()
+        self.network = IfnNetworkMulti()
 
     # def _is_numeric(self, X):
     #     if len(np.unique(X)) == 2:

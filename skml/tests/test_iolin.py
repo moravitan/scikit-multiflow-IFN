@@ -1,9 +1,7 @@
 import numpy as np
-
 from sklearn.utils import check_X_y
-
-from skml._data_processing import DataProcessor
-from skml._ifn_network import IfnNetwork, HiddenLayer, AttributeNode
+from skml.data_processing import DataProcessor
+from skml.ifn_network import IfnNetwork, HiddenLayer, AttributeNode
 from skml.IOLIN.ifn_basic_incremental import BasicIncremental
 
 network = IfnNetwork()

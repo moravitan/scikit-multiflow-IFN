@@ -1,14 +1,9 @@
 import pickle
-import pandas as pd
 from sklearn.metrics import accuracy_score
 from skml.multi.ifn_classifier_multi import IfnClassifierMulti
-from skml.multi._data_processing_multi import DataProcessor
-from skmultiflow.data import RandomTreeGenerator
-import pytest
-import os
+from skml.multi.data_processing_multi import DataProcessorMulti
 import filecmp
 import numpy as np
-import shutil
 
 dataset_path = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Chess_multi.csv"
 test_size_percentage = 0.3

@@ -1,5 +1,5 @@
 
 from skml.multi.ifn_classifier_multi import IfnClassifierMulti
-from skml.multi._data_processing_multi import DataProcessor
+from skml.multi.data_processing_multi import DataProcessorMulti
 
-__all__ = ['IfnClassifierMulti', 'DataProcessor']
+__all__ = ['IfnClassifierMulti', 'DataProcessorMulti']

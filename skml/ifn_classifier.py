@@ -5,7 +5,7 @@ License: BSD 3 clause
 """
 import numpy as np
 import pandas as pd
-from ._ifn_network import IfnNetwork, HiddenLayer
+from .ifn_network import IfnNetwork, HiddenLayer
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from skmultiflow.core import BaseSKMObject, ClassifierMixin
 from skml import utils

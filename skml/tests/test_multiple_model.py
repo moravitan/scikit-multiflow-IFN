@@ -1,4 +1,3 @@
-import pytest
 from skml.IOLIN import MultipleModel
 from skml import IfnClassifier
 

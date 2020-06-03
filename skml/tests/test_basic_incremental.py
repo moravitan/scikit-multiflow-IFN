@@ -1,4 +1,3 @@
-import pytest
 from skml.IOLIN import BasicIncremental
 from skml import IfnClassifier
 
