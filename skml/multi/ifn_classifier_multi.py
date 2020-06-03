@@ -62,7 +62,7 @@ class IfnClassifierMulti():
         The maximum number of layers the network will have.
     """
 
-    def __init__(self, alpha=0.99, multi_label=False, max_number_of_layers=math.inf, window_size=100):
+    def __init__(self, alpha=0.99, multi_label=False, file_path='skml', max_number_of_layers=math.inf, window_size=100):
         if 0 <= alpha < 1:
             self.max_number_of_layers = max_number_of_layers
             self.window_size = window_size
@@ -98,6 +98,8 @@ class IfnClassifierMulti():
             self.is_fitted_ = False
             # y_cols: list of attributes targets
             self.y_cols = []
+            # file path of output and prediction files
+            self.file_path = file_path + '/'
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetworkMulti()
@@ -154,7 +156,7 @@ class IfnClassifierMulti():
 
         significant_attributes_per_node = {}
 
-        with open("output.txt", "w+") as f:
+        with open(self.file_path + "output.txt", "w+") as f:
             f.write('Output data for dataset: \n\n')
             f.write('Total instances: ' + str(self.total_records) + '\n')
             f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
@@ -290,7 +292,7 @@ class IfnClassifierMulti():
         if len(current_layer.get_nodes()) > 0:
             self._set_terminal_nodes(nodes=current_layer.get_nodes(), class_count=self.class_count)
 
-        with open('output.txt', 'a') as f:
+        with open(self.file_path + 'output.txt', 'a') as f:
             f.write('Total nodes created:' + str(curr_node_index) + "\n")
             end = time.time()
             f.write("Running time: " + str(round(end - start, 3)) + " Sec")
@@ -358,9 +360,9 @@ class IfnClassifierMulti():
                         break
         predicted_df = pd.DataFrame.from_dict(predicted)
         if self.multi_label is False:
-            predicted_df.to_csv('predict_multi_target.csv')
+            predicted_df.to_csv(self.file_path + 'predict_multi_target.csv')
         else:
-            with open('predict_multi_label.txt', 'w') as f:
+            with open(self.file_path + 'predict_multi_label.txt', 'w') as f:
                 predicted_label = {}
                 for index, row in predicted_df.iterrows():
                     row_label = []
@@ -416,7 +418,7 @@ class IfnClassifierMulti():
                             prev_node_index = chosen_node.index
                         break
         predicted_df = pd.DataFrame.from_dict(predicted)
-        predicted_df.to_csv('predict_prob_multi.csv')
+        predicted_df.to_csv(self.file_path + 'predict_prob_multi.csv')
         return predicted_df
 
     # the same function

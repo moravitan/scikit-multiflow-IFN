@@ -1,18 +1,23 @@
 import pickle
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 from skml.multi.ifn_classifier_multi import IfnClassifierMulti
 from skml.multi.data_processing_multi import DataProcessorMulti
 import filecmp
 import numpy as np
+import pandas as pd
 
-dataset_path = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Chess_multi.csv"
+data = pd.read_csv("skml/tests/datasets/music.csv")
+y = data.iloc[:, :6]
+X = data.iloc[:, 6:16]
 test_size_percentage = 0.3
 alpha = 0.99
 
+
 def test__model_pickle_const_dataset_multi_target(tmpdir):
-    clf = IfnClassifierMulti(alpha, multi_label=False)
+    clf = IfnClassifierMulti(alpha, multi_label=False, file_path='skml/multi_target')
     dp = DataProcessorMulti()
-    x_train, x_test, y_train, y_test = dp.convert(dataset_path, test_size_percentage)
+    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size_percentage)
 
     clf.fit(x_train, y_train)
     pickle_file = tmpdir.join("clf.pickle")
@@ -33,9 +38,9 @@ def test__model_pickle_const_dataset_multi_target(tmpdir):
 
 
 def test__model_pickle_const_dataset_multi_label(tmpdir):
-    clf = IfnClassifierMulti(alpha, multi_label=False)
+    clf = IfnClassifierMulti(alpha, multi_label=True, file_path='skml/multi_label')
     dp = DataProcessorMulti()
-    x_train, x_test, y_train, y_test = dp.convert(dataset_path, test_size_percentage)
+    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size_percentage)
 
     clf.fit(x_train, y_train)
     pickle_file = tmpdir.join("clf.pickle")
