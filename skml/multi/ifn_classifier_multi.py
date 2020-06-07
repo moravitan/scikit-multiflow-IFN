@@ -156,12 +156,12 @@ class IfnClassifierMulti():
 
         significant_attributes_per_node = {}
 
-        with open(self.file_path + "output.txt", "w+") as f:
-            f.write('Output data for dataset: \n\n')
-            f.write('Total instances: ' + str(self.total_records) + '\n')
-            f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
-            f.write('Minimum confidence level is: ' + str(self.alpha) + '\n\n')
-            f.close()
+        # with open(self.file_path + "output.txt", "w+") as f:
+        #     f.write('Output data for dataset: \n\n')
+        #     f.write('Total instances: ' + str(self.total_records) + '\n')
+        #     f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
+        #     f.write('Minimum confidence level is: ' + str(self.alpha) + '\n\n')
+        #     f.close()
 
         # Build the network while:
         # 1. The maximum number of hidden layers is not exceeded
@@ -186,10 +186,10 @@ class IfnClassifierMulti():
                 if curr_node_index == 1:
                     print('No Nodes at the network. choose smaller alpha')
                     sys.exit()
-                utils.write_details_to_file(layer_position=layer,
-                                            attributes_cmi=attributes_mi,
-                                            chosen_attribute_index=global_chosen_attribute,
-                                            chosen_attribute=cols[global_chosen_attribute])
+                # utils.write_details_to_file(layer_position=layer,
+                #                             attributes_cmi=attributes_mi,
+                #                             chosen_attribute_index=global_chosen_attribute,
+                #                             chosen_attribute=cols[global_chosen_attribute])
                 break
 
             nodes_list = []
@@ -272,10 +272,10 @@ class IfnClassifierMulti():
             current_layer = next_layer
             number_of_layers += 1
 
-            utils.write_details_to_file(layer_position=layer,
-                                   attributes_cmi=attributes_mi,
-                                   chosen_attribute_index=global_chosen_attribute,
-                                   chosen_attribute=cols[global_chosen_attribute])
+            # utils.write_details_to_file(layer_position=layer,
+            #                        attributes_cmi=attributes_mi,
+            #                        chosen_attribute_index=global_chosen_attribute,
+            #                        chosen_attribute=cols[global_chosen_attribute])
 
             # overrides the value until the last iteration
             self.last_layer_mi = attributes_mi[global_chosen_attribute]
@@ -595,7 +595,7 @@ class IfnClassifierMulti():
     # the same function
     def _discretization(self, attribute_index, interval, total_mi=0, nodes=None, prev_split_points=None):
         """ A recursive implementation of a discretization of the IFN algorithm according to the algorithm
-            published in -- TODO: *** ADD A LINK***
+            published in "Maimon, Oded, and Mark Last. "Knowledge discovery and data mining." Klewer Pub. Co (2001)."
 
 
         Parameters
@@ -907,6 +907,7 @@ class IfnClassifierMulti():
             is_continuous = 'category' not in columns_type[attribute_index]
             if is_continuous:
                 attribute_data = list(X[:, attribute_index])
+                attribute_data = [round(num, 2) for num in attribute_data]
                 self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
                 data_class_array = list(zip(attribute_data, y))
                 data_class_array.sort(key=lambda tup: tup[0])
