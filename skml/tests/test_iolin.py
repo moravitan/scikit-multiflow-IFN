@@ -161,8 +161,3 @@ def test_clone_network():
     assert copy_network.root_node.first_layer.index == 1
     assert len(copy_network.root_node.first_layer.next_layer.nodes) == 4
 
-
-
-test_eliminate_all_nodes_in_layer()
-test_eliminate_some_nodes_in_layer()
-test_clone_network()

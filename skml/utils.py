@@ -236,13 +236,15 @@ def create_attribute_node(partial_X, partial_y, chosen_attribute_index, attribut
                              y=partial_y,
                              attribute_index=chosen_attribute_index,
                              value=attribute_value)
-    # Create a new AttributeNode
-    attributes_node = AttributeNode(index=curr_node_index,
-                                    attribute_value=attribute_value,
-                                    prev_node=prev_node_index,
-                                    layer=chosen_attribute_index,
-                                    partial_x=x_y_tuple[0],
-                                    partial_y=x_y_tuple[1])
+    # Create a new AttributeNode only is it has samples
+    attributes_node = None
+    if len(x_y_tuple[0]):
+        attributes_node = AttributeNode(index=curr_node_index,
+                                        attribute_value=attribute_value,
+                                        prev_node=prev_node_index,
+                                        layer=chosen_attribute_index,
+                                        partial_x=x_y_tuple[0],
+                                        partial_y=x_y_tuple[1])
     return attributes_node
 
 
@@ -262,11 +264,10 @@ def get_columns_type(X):
 
     columns_type = []
     for dt in X.columns:
-        if len(np.unique(X[dt])) > 10:
-            columns_type.append(str(X[dt].dtype))
-        else:
+        if len(np.unique(X[dt])) / len(X) < 0.03:
             columns_type.append("category")
-
+        else:
+            columns_type.append(str(X[dt].dtype))
     return columns_type
 
 
