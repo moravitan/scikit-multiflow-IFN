@@ -20,13 +20,21 @@ def test_iris_dataset():
     y = iris.target
 
     clf.fit(X, y)
-
     expected_train_accuracy = 0.020000000000000018
     assert np.isclose(expected_train_accuracy, clf.training_error)
     assert len(clf.network.root_node.first_layer.nodes) == 4
     assert len(clf.network.root_node.first_layer.next_layer.nodes) == 5
     assert clf.network.root_node.first_layer.index == 2
     assert clf.network.root_node.first_layer.next_layer.index == 3
+
+
+def test_credit():
+    clf = IfnClassifier(alpha)
+    dp = DataProcessor()
+    X,y = dp.convert("C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit_full.csv",0.1)
+    clf.fit(X,y)
+
+    clf.network.create_network_structure_file(path="C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\network.txt")
 
 
 def test_model_pickle_const_dataset(tmpdir):
@@ -97,3 +105,6 @@ def test_partial_fit():
     assert np.alltrue(predictions == expected_predictions)
     assert np.isclose(expected_performance, performance)
     assert correct_predictions == expected_correct_predictions
+
+
+test_credit()

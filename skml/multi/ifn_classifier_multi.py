@@ -131,16 +131,14 @@ class IfnClassifierMulti():
 
         cols = list(X.columns.values)
         columns_type = utils.get_columns_type(X)
-        self.y_cols = list(y.columns.values)
-        X, y = check_X_y(X, y, accept_sparse=True, multi_output=True)
-        self.class_count = {}
-        for i in self.y_cols:
-            self.total_records = np.size(y, 0)
-            unique, counts = np.unique(np.array(y[:, self.y_cols.index(i)]), return_counts=True)
-            self.class_count[i] = np.asarray((unique, counts)).T
-            if len(unique) > self.num_of_classes:
-                self.num_of_classes = len(unique)
-            self.network.build_target_layer(unique, self.y_cols.index(i))
+
+        X, y = check_X_y(X, y, accept_sparse=True)
+        X_copy = X.copy()
+        y_copy = y.copy()
+        self.total_records = len(y)
+        unique, counts = np.unique(np.array(y), return_counts=True)
+        self.class_count = np.asarray((unique, counts)).T
+        self.num_of_classes = len(unique)
 
         # create list the holds the attributes indexes
         attributes_indexes = list(range(0, len(X[0])))
@@ -300,8 +298,8 @@ class IfnClassifierMulti():
 
         self.is_fitted_ = True
         print("Done. Network is fitted")
-        self.training_error = self.calculate_error_rate(X=X, y=y)
-        # print("the training error is " + str(self.training_error))
+
+        self.training_error = self.calculate_error_rate(X=X_copy, y=y_copy)
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
             utils.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
 
@@ -563,26 +561,26 @@ class IfnClassifierMulti():
         """
 
         self.split_points[attribute_index] = []
-        splited_nodes = []
-        new_total_mi = 0
+        splitted_nodes = []
         # first layer
         if nodes is None:
             new_total_mi = self._discretization(attribute_index=attribute_index,
-                                                total_mi=0,
-                                                interval=self.intervals_per_attribute[attribute_index])
+                                                interval=self.intervals_per_attribute[attribute_index], total_mi=[0])
+            new_total_mi = new_total_mi[0]
         else:
-            self._discretization(attribute_index=attribute_index,
-                                 total_mi=0,
-                                 interval=self.intervals_per_attribute[attribute_index],
-                                 nodes=nodes)
+            new_total_mi = self._discretization(attribute_index=attribute_index,
+                                                interval=self.intervals_per_attribute[attribute_index], total_mi=[0],
+                                                nodes=nodes)
+            new_total_mi = new_total_mi[0]
 
             if bool(self.splitted_nodes_by_split_points):
-                total_mi = [el[2] for el in self.splitted_nodes_by_split_points]
-                max_mi = max(total_mi)
-                max_mi_index = total_mi.index(max_mi)
-                self.split_points[attribute_index] = list(self.splitted_nodes_by_split_points[max_mi_index][0])
-                new_total_mi = max_mi
-                splited_nodes = list(self.splitted_nodes_by_split_points[max_mi_index][1])
+                # total_mi = [el[2] for el in self.splitted_nodes_by_split_points]
+                # max_mi = max(total_mi)
+                # max_mi_index = total_mi.index(max_mi)
+                # self.split_points[attribute_index] = list(self.splitted_nodes_by_split_points[max_mi_index][0])
+                # new_total_mi = max_mi
+                # splitted_nodes = list(self.splitted_nodes_by_split_points[max_mi_index][1])
+                splitted_nodes = self.splitted_nodes_by_split_points.copy()
                 self.splitted_nodes_by_split_points.clear()
 
         if bool(self.split_points[attribute_index]):  # there are split points
@@ -590,7 +588,7 @@ class IfnClassifierMulti():
         else:
             attributes_mi[attribute_index] = 0
 
-        return splited_nodes
+        return splitted_nodes
 
     # the same function
     def _discretization(self, attribute_index, interval, total_mi=0, nodes=None, prev_split_points=None):
@@ -619,8 +617,11 @@ class IfnClassifierMulti():
         Returns
         -------
             The new total mutual information of the attribute being checked
+            :param nodes:
 
         """
+        if total_mi is None:
+            total_mi = [0]
         interval_values = [i[0] for i in interval]
         distinct_attribute_data = np.unique(interval_values)
 
@@ -631,8 +632,6 @@ class IfnClassifierMulti():
         split_point_mi_map = {}
         # mapping for each node the mutual information of every possible split point
         node_mi_per_threshold = {}
-        # list to save the nodes which can be splited by the founded split point
-        splited_nodes = []
         # save the olf total mutual information in case no split point will be founded
         new_total_mi = total_mi
         # Counter for the number of nodes we don't need to check anymore
@@ -665,7 +664,6 @@ class IfnClassifierMulti():
                     # For each point save it's mutual information
                     split_point_mi_map[T] = t_mi
             else:
-                how_many_nodes_exceeded = 0
                 for node in nodes:
                     partial_X = node.partial_x
                     partial_y = node.partial_y
@@ -699,9 +697,6 @@ class IfnClassifierMulti():
                             node_mi_per_threshold[node.index] = {}
                         node_mi_per_threshold[node.index][T] = 0
 
-            if nodes is not None and how_many_nodes_exceeded == len(nodes):
-                break
-
         if bool(split_point_mi_map):  # if not empty
             # Find the split point which maximize the mutual information
             split_point = max(split_point_mi_map, key=split_point_mi_map.get)
@@ -728,29 +723,17 @@ class IfnClassifierMulti():
                     if node.index in node_mi_per_threshold.keys() \
                             and split_point in node_mi_per_threshold[node.index].keys() \
                             and node_mi_per_threshold[node.index][split_point] > 0:
-                        splited_nodes.append(node)
-            else:
-                splited_nodes = None
+                        self.splitted_nodes_by_split_points.append(node)
+                self.splitted_nodes_by_split_points = list(set(self.splitted_nodes_by_split_points))
 
-            new_total_mi += split_point_mi_map[split_point]
-
-            if curr_previous_split_points is not None:
-                split_point_set = frozenset(curr_previous_split_points)
-                self.splitted_nodes_by_split_points.append([split_point_set, splited_nodes, new_total_mi])
-                curr_previous_split_points = frozenset(curr_previous_split_points)
+            new_total_mi[0] += split_point_mi_map[split_point]
 
             if bool(interval_smaller):
-                self._discretization(attribute_index=attribute_index,
-                                     total_mi=new_total_mi,
-                                     interval=interval_smaller,
-                                     nodes=splited_nodes,
-                                     prev_split_points=curr_previous_split_points)
+                self._discretization(attribute_index=attribute_index, interval=interval_smaller, total_mi=new_total_mi,
+                                     nodes=nodes, prev_split_points=curr_previous_split_points)
             if bool(interval_larger):
-                self._discretization(attribute_index=attribute_index,
-                                     total_mi=new_total_mi,
-                                     interval=interval_larger,
-                                     nodes=splited_nodes,
-                                     prev_split_points=curr_previous_split_points)
+                self._discretization(attribute_index=attribute_index, interval=interval_larger, total_mi=new_total_mi,
+                                     nodes=nodes, prev_split_points=curr_previous_split_points)
         return new_total_mi
 
     def _calculate_statistic_and_critical_for_interval(self, X, y):
