@@ -131,14 +131,16 @@ class IfnClassifierMulti():
 
         cols = list(X.columns.values)
         columns_type = utils.get_columns_type(X)
-
-        X, y = check_X_y(X, y, accept_sparse=True)
-        X_copy = X.copy()
-        y_copy = y.copy()
-        self.total_records = len(y)
-        unique, counts = np.unique(np.array(y), return_counts=True)
-        self.class_count = np.asarray((unique, counts)).T
-        self.num_of_classes = len(unique)
+        self.y_cols = list(y.columns.values)
+        X, y = check_X_y(X, y, accept_sparse=True, multi_output=True)
+        self.class_count = {}
+        for i in self.y_cols:
+            self.total_records = np.size(y, 0)
+            unique, counts = np.unique(np.array(y[:, self.y_cols.index(i)]), return_counts=True)
+            self.class_count[i] = np.asarray((unique, counts)).T
+            if len(unique) > self.num_of_classes:
+                self.num_of_classes = len(unique)
+            self.network.build_target_layer(unique, self.y_cols.index(i))
 
         # create list the holds the attributes indexes
         attributes_indexes = list(range(0, len(X[0])))

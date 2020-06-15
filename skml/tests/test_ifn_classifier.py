@@ -10,8 +10,8 @@ import numpy as np
 import pandas as pd
 import shutil
 
-
 alpha = 0.95
+
 
 def test_iris_dataset():
     clf = IfnClassifier(alpha)
@@ -28,16 +28,25 @@ def test_iris_dataset():
     assert clf.network.root_node.first_layer.next_layer.index == 3
 
 
+
 def test_credit():
     clf = IfnClassifier(alpha)
     dp = DataProcessor()
-    X,y = dp.convert("C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit_full.csv",0.1)
-    clf.fit(X,y)
+    X, y = dp.convert("C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit_full.csv",
+                      0.1)
+    clf.fit(X, y)
 
-    clf.network.create_network_structure_file(path="C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\network.txt")
+    # clf.network.create_network_structure_file(
+    #     path="C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\network.txt")
 
+    expected_train_accuracy = 0.05797101449275366
+    assert np.isclose(expected_train_accuracy, clf.training_error)
+    assert len(clf.network.root_node.first_layer.nodes) == 2
+    assert len(clf.network.root_node.first_layer.next_layer.nodes) == 32
+    assert clf.network.root_node.first_layer.index == 7
+    assert clf.network.root_node.first_layer.next_layer.index == 2
 
-def test_model_pickle_const_dataset(tmpdir):
+def test_model_pickle_stream_dataset(tmpdir):
     clf = IfnClassifier(alpha)
     stream = RandomTreeGenerator(tree_random_state=112,
                                  sample_random_state=112,
@@ -61,8 +70,6 @@ def test_model_pickle_const_dataset(tmpdir):
 
     assert filecmp.cmp(pickle_network_structure_file, network_structure_file) is True
     assert np.array_equal(y_pred, loaded_y_pred)
-    print(accuracy_score(y_test, y_pred))
-    assert accuracy_score(y_test, y_pred) == accuracy_score(y_test, loaded_y_pred)
 
 
 def test_partial_fit():
@@ -106,5 +113,3 @@ def test_partial_fit():
     assert np.isclose(expected_performance, performance)
     assert correct_predictions == expected_correct_predictions
 
-
-test_credit()
