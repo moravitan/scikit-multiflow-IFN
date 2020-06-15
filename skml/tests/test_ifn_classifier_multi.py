@@ -4,6 +4,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from skml.multi.ifn_classifier_multi import IfnClassifierMulti
 from skml.multi.data_processing_multi import DataProcessorMulti
+from skmultiflow.data.multilabel_generator import MultilabelGenerator
 import filecmp
 import numpy as np
 import pandas as pd
@@ -78,4 +79,67 @@ import shutil
 #     print("accuracy:", accuracy_score(y_test, y_pred))
 #     assert accuracy_score(y_test, y_pred) == accuracy_score(y_test, loaded_y_pred)
 
+alpha = 0.95
 
+
+def test_internet_usage():
+    clf = IfnClassifierMulti(alpha)
+    dp = DataProcessorMulti()
+    X, y = dp.convert("C:\\Users\\user\Desktop\פרויקט גמר\MultiFlow\IFN\Internet_Usage_multi\\final_general2.csv",0.1)
+    clf.fit(X, y)
+    clf.network.create_network_structure_file(path="C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\network.txt")
+
+
+# test_internet_usage()
+
+
+def test_partial_fit():
+    stream = MultilabelGenerator(n_samples=100, n_features=20, n_targets=4, n_labels=4, random_state=0)
+
+    estimator = IfnClassifierMulti(alpha, multi_label=True, window_size=100)
+    stream.prepare_for_use()
+    X, y = stream.next_sample(100)
+    estimator.partial_fit(X, y, classes=stream.n_targets)
+
+    cnt = 0
+    max_samples = 2000
+    predictions = []
+    true_labels = []
+    wait_samples = 100
+    correct_predictions = 0
+
+    while cnt < max_samples:
+        X, y = stream.next_sample()
+        # Test every n samples
+        if (cnt % wait_samples == 0) and (cnt != 0):
+            predictions.append(estimator.predict(X)[0])
+            true_labels.append(y[0])
+            if np.array_equal(y[0], predictions[-1]):
+                correct_predictions += 1
+
+        estimator.partial_fit(X, y)
+        cnt += 1
+
+    performance = correct_predictions / len(predictions)
+    expected_predictions = [0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                            0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0]
+
+    expected_correct_predictions = 14
+    expected_performance = 0.7368421052631579
+
+    assert np.alltrue(predictions == expected_predictions)
+    assert np.isclose(expected_performance, performance)
+    assert correct_predictions == expected_correct_predictions
+
+
+# test_partial_fit()
+
+def test_chess():
+    clf = IfnClassifierMulti(alpha)
+    dp = DataProcessorMulti()
+    x_train, x_test, y_train, y_test = dp.convert("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Chess_multi.csv",0.3)
+    clf.fit(x_train, y_train)
+    clf.predict(x_test)
+
+
+test_chess()

@@ -23,6 +23,7 @@ class DataProcessorMulti:
         # multi manual
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
         return X_train, X_test, y_train, y_test
+        # return X, y
 
     def _data_processing(self, df):
         """

@@ -13,6 +13,7 @@ import collections
 import time
 import sys
 import pandas as pd
+from skmultiflow.core import BaseSKMObject, ClassifierMixin
 
 
 def _drop_records(X, y, attribute_index, value):
@@ -47,7 +48,7 @@ def _drop_records(X, y, attribute_index, value):
     return np.array(new_x), np.array(new_y)
 
 
-class IfnClassifierMulti():
+class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
     """ A template estimator to be used as a reference implementation.
 
     For more information regarding how to build your own estimator, read more
@@ -62,7 +63,7 @@ class IfnClassifierMulti():
         The maximum number of layers the network will have.
     """
 
-    def __init__(self, alpha=0.99, multi_label=False, file_path='skml', max_number_of_layers=math.inf, window_size=100):
+    def __init__(self, alpha=0.99, multi_label=False, max_number_of_layers=math.inf, window_size=100):
         if 0 <= alpha < 1:
             self.max_number_of_layers = max_number_of_layers
             self.window_size = window_size
@@ -98,8 +99,6 @@ class IfnClassifierMulti():
             self.is_fitted_ = False
             # y_cols: list of attributes targets
             self.y_cols = []
-            # file path of output and prediction files
-            self.file_path = file_path + '/'
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetworkMulti()
@@ -132,7 +131,7 @@ class IfnClassifierMulti():
         cols = list(X.columns.values)
         columns_type = utils.get_columns_type(X)
 
-        X, y = check_X_y(X, y, accept_sparse=True)
+        X, y = check_X_y(X, y, accept_sparse=True, multi_output=True)
         X_copy = X.copy()
         y_copy = y.copy()
         self.total_records = len(y)
@@ -154,12 +153,12 @@ class IfnClassifierMulti():
 
         significant_attributes_per_node = {}
 
-        # with open(self.file_path + "output.txt", "w+") as f:
-        #     f.write('Output data for dataset: \n\n')
-        #     f.write('Total instances: ' + str(self.total_records) + '\n')
-        #     f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
-        #     f.write('Minimum confidence level is: ' + str(self.alpha) + '\n\n')
-        #     f.close()
+        with open("output_multi.txt", "w+") as f:
+            f.write('Output data for dataset: \n\n')
+            f.write('Total instances: ' + str(self.total_records) + '\n')
+            f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
+            f.write('Minimum confidence level is: ' + str(self.alpha) + '\n\n')
+            f.close()
 
         # Build the network while:
         # 1. The maximum number of hidden layers is not exceeded
@@ -290,7 +289,7 @@ class IfnClassifierMulti():
         if len(current_layer.get_nodes()) > 0:
             self._set_terminal_nodes(nodes=current_layer.get_nodes(), class_count=self.class_count)
 
-        with open(self.file_path + 'output.txt', 'a') as f:
+        with open('output_multi.txt', 'a') as f:
             f.write('Total nodes created:' + str(curr_node_index) + "\n")
             end = time.time()
             f.write("Running time: " + str(round(end - start, 3)) + " Sec")
@@ -358,9 +357,9 @@ class IfnClassifierMulti():
                         break
         predicted_df = pd.DataFrame.from_dict(predicted)
         if self.multi_label is False:
-            predicted_df.to_csv(self.file_path + 'predict_multi_target.csv')
+            predicted_df.to_csv('predict_multi_target.csv')
         else:
-            with open(self.file_path + 'predict_multi_label.txt', 'w') as f:
+            with open('predict_multi_label.txt', 'w') as f:
                 predicted_label = {}
                 for index, row in predicted_df.iterrows():
                     row_label = []
@@ -416,7 +415,7 @@ class IfnClassifierMulti():
                             prev_node_index = chosen_node.index
                         break
         predicted_df = pd.DataFrame.from_dict(predicted)
-        predicted_df.to_csv(self.file_path + 'predict_prob_multi.csv')
+        predicted_df.to_csv('predict_prob_multi.csv')
         return predicted_df
 
     # the same function
@@ -1015,24 +1014,34 @@ class IfnClassifierMulti():
 
         """
         N, D = X.shape
+        isEnoughSamples = False
+
+        if self.i == 0:
+            # No models yet -- initialize
+            self.X_batch = np.zeros((self.window_size, D))
+            self.y_batch = np.zeros((self.window_size, classes))
+            self.sample_weight = np.zeros(N)
+            self.i = 0
 
         for n in range(N):
             # For each instance ...
-            self.X_batch.append(X[n])
-            self.y_batch.append(y[n])
+            self.X_batch[self.i] = X[n]
+            self.y_batch[self.i] = y[n]
             # self.sample_weight[self.i] = sample_weight[n] if sample_weight else 1.0
             self.i = self.i + 1
+
             if self.i == self.window_size:
+                isEnoughSamples = True
                 # Train it
                 X_batch_df = pd.DataFrame(self.X_batch)
-                self.fit(X=X_batch_df, y=self.y_batch, classes=classes, sample_weight=sample_weight)
+                y_batch_df = pd.DataFrame(self.y_batch)
+                self.fit(X=X_batch_df, y=y_batch_df, classes=classes, sample_weight=sample_weight)
                 # Reset the window
                 self.i = 0
-                self.X_batch.clear()
-                self.y_batch.clear()
 
-        if not self.is_fitted_:
-            print("There are not enough samples to build a network")
+        # if not isEnoughSamples:
+        # TODO maybe change to return 0
+        # print("There are not enough samples to build a network")
 
         return self
 
