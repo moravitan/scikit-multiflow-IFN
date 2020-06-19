@@ -16,38 +16,6 @@ import pandas as pd
 from skmultiflow.core import BaseSKMObject, ClassifierMixin
 
 
-def _drop_records(X, y, attribute_index, value):
-    """ Drop the samples in X which doesn't equal to value.
-
-    Parameters
-    ----------
-    x: {array-like, sparse matrix}, shape (n_samples, n_features)
-        The samples from a specific node.
-
-    y: {array-like, sparse matrix}, shape (n_samples, y_classes)
-        Contains the true class labels for all the samples in X.
-
-    attribute_index: int
-        The index of the attribute upon the network will be splited by.
-
-    value: int or float
-        The data value to keep in x.
-
-
-    Returns
-    -------
-        np.array of the samples which their data value in attribute_index is equal to value.
-
-    """
-    new_x = []
-    new_y = []
-    for i in range(0, np.size(X, 0)):
-        if X[i][attribute_index] == value:
-            new_x.append(X[i])
-            new_y.append(y[i])
-    return np.array(new_x), np.array(new_y)
-
-
 class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
     """ A template estimator to be used as a reference implementation.
 
@@ -63,7 +31,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         The maximum number of layers the network will have.
     """
 
-    def __init__(self, alpha=0.99, multi_label=False, file_path='skml', max_number_of_layers=math.inf, window_size=100):
+    def __init__(self, file_path, alpha=0.99, multi_label=False, max_number_of_layers=math.inf, window_size=100):
         if 0 <= alpha < 1:
             self.max_number_of_layers = max_number_of_layers
             self.window_size = window_size
@@ -77,8 +45,8 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             self.index_of_sec_best_att = 0
             self.sec_att_split_points = None
             self.class_count = None
-            # Number of classes in the target
-            self.num_of_classes = 0
+            # Number of classes in the target every target
+            self.num_of_classes = {}
             # Dictionary that contains the unique value for each attribute
             self.unique_values_per_attribute = {}
             # Dictionary that contains all the split points for each attribute
@@ -100,14 +68,10 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             # y_cols: list of attributes targets
             self.y_cols = []
             # file path of output and prediction files
-            self.file_path = file_path + '/'
+            self.file_path = file_path
         else:
             raise ValueError("Enter a valid alpha between 0 to 1")
         self.network = IfnNetworkMulti()
-
-    # def _is_numeric(self, X):
-    #     if len(np.unique(X)) == 2:
-    #         return False
 
     def fit(self, X, y, classes=None, sample_weight=None):
         """A reference implementation of a fitting function.
@@ -131,18 +95,19 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         print('Building the network...')
 
         cols = list(X.columns.values)
+        cols = [str(i) for i in cols]
+
         columns_type = utils.get_columns_type(X)
         self.y_cols = list(y.columns.values)
         X, y = check_X_y(X, y, accept_sparse=True, multi_output=True)
         X_copy = X.copy()
         y_copy = y.copy()
         self.class_count = {}
+        self.total_records = np.size(y, 0)
         for i in self.y_cols:
-            self.total_records = np.size(y, 0)
             unique, counts = np.unique(np.array(y[:, self.y_cols.index(i)]), return_counts=True)
             self.class_count[i] = np.asarray((unique, counts)).T
-            if len(unique) > self.num_of_classes:
-                self.num_of_classes = len(unique)
+            self.num_of_classes[i] = len(unique)
             self.network.build_target_layer(unique, self.y_cols.index(i))
 
         # create list the holds the attributes indexes
@@ -159,12 +124,12 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
 
         significant_attributes_per_node = {}
 
-        # with open(self.file_path + "output.txt", "w+") as f:
-        #     f.write('Output data for dataset: \n\n')
-        #     f.write('Total instances: ' + str(self.total_records) + '\n')
-        #     f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
-        #     f.write('Minimum confidence level is: ' + str(self.alpha) + '\n\n')
-        #     f.close()
+        with open('output.txt', "w+") as f:
+            f.write('Output data for dataset: \n\n')
+            f.write('Total instances: ' + str(self.total_records) + '\n')
+            f.write('Number of candidate input attributes is: ' + str(len(attributes_indexes)) + '\n')
+            f.write('Minimum confidence level is: ' + str(self.alpha) + '\n\n')
+            f.close()
 
         # Build the network while:
         # 1. The maximum number of hidden layers is not exceeded
@@ -189,10 +154,10 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                 if curr_node_index == 1:
                     print('No Nodes at the network. choose smaller alpha')
                     sys.exit()
-                # utils.write_details_to_file(layer_position=layer,
-                #                             attributes_cmi=attributes_mi,
-                #                             chosen_attribute_index=global_chosen_attribute,
-                #                             chosen_attribute=cols[global_chosen_attribute])
+                utils.write_details_to_file(layer_position=layer,
+                                            attributes_cmi=attributes_mi,
+                                            chosen_attribute_index=global_chosen_attribute,
+                                            chosen_attribute=cols[global_chosen_attribute])
                 break
 
             nodes_list = []
@@ -245,11 +210,11 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                 prev_node = 0
                 for i in self.unique_values_per_attribute[global_chosen_attribute]:
                     attribute_node = utils.create_attribute_node(partial_X=X,
-                                                            partial_y=y,
-                                                            chosen_attribute_index=global_chosen_attribute,
-                                                            attribute_value=i,
-                                                            curr_node_index=curr_node_index,
-                                                            prev_node_index=prev_node)
+                                                                 partial_y=y,
+                                                                 chosen_attribute_index=global_chosen_attribute,
+                                                                 attribute_value=i,
+                                                                 curr_node_index=curr_node_index,
+                                                                 prev_node_index=prev_node)
                     nodes_list.append(attribute_node)
                     curr_node_index += 1
 
@@ -275,10 +240,10 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             current_layer = next_layer
             number_of_layers += 1
 
-            # utils.write_details_to_file(layer_position=layer,
-            #                        attributes_cmi=attributes_mi,
-            #                        chosen_attribute_index=global_chosen_attribute,
-            #                        chosen_attribute=cols[global_chosen_attribute])
+            utils.write_details_to_file(layer_position=layer,
+                                        attributes_cmi=attributes_mi,
+                                        chosen_attribute_index=global_chosen_attribute,
+                                        chosen_attribute=cols[global_chosen_attribute])
 
             # overrides the value until the last iteration
             self.last_layer_mi = attributes_mi[global_chosen_attribute]
@@ -295,7 +260,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         if len(current_layer.get_nodes()) > 0:
             self._set_terminal_nodes(nodes=current_layer.get_nodes(), class_count=self.class_count)
 
-        with open(self.file_path + 'output.txt', 'a') as f:
+        with open('output.txt', "a") as f:
             f.write('Total nodes created:' + str(curr_node_index) + "\n")
             end = time.time()
             f.write("Running time: " + str(round(end - start, 3)) + " Sec")
@@ -341,9 +306,14 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                 record_value = record[curr_layer.index]
                 if curr_layer.is_continuous:
                     record_value = utils.find_split_position(value=record_value,
-                                                        positions=curr_layer.split_points)
-                for node in curr_layer.nodes:
-                    if node.attribute_value == record_value and node.prev_node == prev_node_index:
+                                                             positions=curr_layer.split_points)
+
+                possible_nodes = [node for node in curr_layer.nodes if node.prev_node == prev_node_index]
+                iteration_number = 1
+                for node in possible_nodes:
+                    if node.attribute_value == record_value or \
+                            (iteration_number == len(possible_nodes) and node.attribute_value + 1 == record_value) or \
+                            (iteration_number == 1 and node.attribute_value - 1 == record_value):
                         chosen_node = node
                         if chosen_node.is_terminal:
                             for key in chosen_node.weight_probability_pair.keys():
@@ -361,6 +331,8 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                             curr_layer = curr_layer.next_layer
                             prev_node_index = chosen_node.index
                         break
+
+                    iteration_number += 1
         predicted_df = pd.DataFrame.from_dict(predicted)
         if self.multi_label is False:
             predicted_df.to_csv(self.file_path + 'predict_multi_target.csv')
@@ -403,9 +375,13 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                 record_value = record[curr_layer.index]
                 if curr_layer.is_continuous is not False:
                     record_value = utils.find_split_position(value=record_value,
-                                                        positions=curr_layer.split_points)
-                for node in curr_layer.nodes:
-                    if node.attribute_value == record_value and node.prev_node == prev_node_index:
+                                                             positions=curr_layer.split_points)
+                possible_nodes = [node for node in curr_layer.nodes if node.prev_node == prev_node_index]
+                iteration_number = 1
+                for node in possible_nodes:
+                    if node.attribute_value == record_value or \
+                            (iteration_number == len(possible_nodes) and node.attribute_value + 1 == record_value) or \
+                            (iteration_number == 1 and node.attribute_value - 1 == record_value):
                         chosen_node = node
                         if chosen_node.is_terminal:
                             for key in chosen_node.weight_probability_pair.keys():
@@ -420,6 +396,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                             curr_layer = curr_layer.next_layer
                             prev_node_index = chosen_node.index
                         break
+                    iteration_number += 1
         predicted_df = pd.DataFrame.from_dict(predicted)
         predicted_df.to_csv(self.file_path + 'predict_prob_multi.csv')
         return predicted_df
@@ -520,26 +497,23 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         node_mi = 0
         attribute_data = list(X[:, attribute_index])
         self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
-
-        mutual_info_score = 0
         for i in range(0, np.size(y, 1)):
-            mutual_info_score += self._calculate_conditional_mutual_information(attribute_data, y[:, i])
-        # statistic = mutual_info_score
-        statistic = 2 * np.log(2) * self.total_records * mutual_info_score
-        # critical = 0
-        critical = stats.chi2.ppf(self.alpha, ((self.num_of_classes - 1) *
-                                               ((len(self.unique_values_per_attribute[attribute_index])) - 1)))
+            mutual_info_score = self._calculate_conditional_mutual_information(attribute_data, y[:, i])
+            # mark - to ask about total record / len(attribute data)
+            statistic = 2 * np.log(2) * self.total_records * mutual_info_score
+            critical = stats.chi2.ppf(self.alpha, (len(np.unique(y[:, i])) - 1) *
+                                      (len(self.unique_values_per_attribute[attribute_index]) - 1))
 
-        if critical < statistic:
-            # sum mutual information overall nodes
-            if attribute_index in attributes_mi.keys():
-                attributes_mi[attribute_index] += mutual_info_score
+            if critical < statistic:
+                # sum mutual information overall nodes
+                if attribute_index in attributes_mi.keys():
+                    attributes_mi[attribute_index] += mutual_info_score
+                else:
+                    attributes_mi[attribute_index] = mutual_info_score
+                node_mi += mutual_info_score
             else:
-                attributes_mi[attribute_index] = mutual_info_score
-            node_mi = mutual_info_score
-        else:
-            if attribute_index not in attributes_mi.keys():
-                attributes_mi[attribute_index] = 0
+                if attribute_index not in attributes_mi.keys():
+                    attributes_mi[attribute_index] = 0
 
         return node_mi
 
@@ -579,12 +553,6 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             new_total_mi = new_total_mi[0]
 
             if bool(self.splitted_nodes_by_split_points):
-                # total_mi = [el[2] for el in self.splitted_nodes_by_split_points]
-                # max_mi = max(total_mi)
-                # max_mi_index = total_mi.index(max_mi)
-                # self.split_points[attribute_index] = list(self.splitted_nodes_by_split_points[max_mi_index][0])
-                # new_total_mi = max_mi
-                # splitted_nodes = list(self.splitted_nodes_by_split_points[max_mi_index][1])
                 splitted_nodes = self.splitted_nodes_by_split_points.copy()
                 self.splitted_nodes_by_split_points.clear()
 
@@ -596,7 +564,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         return splitted_nodes
 
     # the same function
-    def _discretization(self, attribute_index, interval, total_mi=0, nodes=None, prev_split_points=None):
+    def _discretization(self, attribute_index, interval, total_mi=None, nodes=None, prev_split_points=None):
         """ A recursive implementation of a discretization of the IFN algorithm according to the algorithm
             published in "Maimon, Oded, and Mark Last. "Knowledge discovery and data mining." Klewer Pub. Co (2001)."
 
@@ -640,7 +608,6 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         # save the olf total mutual information in case no split point will be founded
         new_total_mi = total_mi
         # Counter for the number of nodes we don't need to check anymore
-        how_many_nodes_exceeded = 0
 
         iterator = iter(distinct_attribute_data)
         next(iterator)
@@ -654,13 +621,11 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             if T in self.split_points[attribute_index]: continue
             if nodes is None:
                 t_attribute_date, new_y = utils.split_data_to_two_intervals(interval=interval,
-                                                                       T=T,
-                                                                       min_value=min_value,
-                                                                       max_value=max_value)
-
+                                                                            T=T,
+                                                                            min_value=min_value,
+                                                                            max_value=max_value)
                 if len(np.unique(t_attribute_date)) != 2:
                     break
-
                 statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
                                                                                                 y=new_y)
 
@@ -676,12 +641,11 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                     data_class_array = list(zip(attribute_data, partial_y))
 
                     t_attribute_date, new_y = utils.split_data_to_two_intervals(interval=data_class_array,
-                                                                           T=T,
-                                                                           min_value=min_value,
-                                                                           max_value=max_value)
+                                                                                T=T,
+                                                                                min_value=min_value,
+                                                                                max_value=max_value)
 
                     if len(np.unique(t_attribute_date)) != 2:
-                        how_many_nodes_exceeded += 1
                         continue
 
                     statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
@@ -758,21 +722,15 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             A float representing the critical of the given interval y
 
         """
-
-        if self.num_of_classes == 2:
-            critical = stats.chi2.ppf(self.alpha, (self.num_of_classes - 1))
-            # critical = 0
-        else:
-            rel_num_of_classes = len(np.unique(np.array(y)))
-            critical = stats.chi2.ppf(self.alpha, (rel_num_of_classes - 1))
-            # critical = 0
         t_mi = 0
-        y = np.array(y)
+        critical = 0
+        statistic = 0
         for i in range(0, np.size(y, 1)):
-            t_mi += self._calculate_conditional_mutual_information(x=X, y=y[:, i])
-        statistic = 2 * np.log(2) * self.total_records * t_mi
-        # statistic = t_mi
-
+            mutual_info_score = self._calculate_conditional_mutual_information(x=X, y=y[:, i])
+            statistic = 2 * np.log(2) * self.total_records * mutual_info_score
+            critical = stats.chi2.ppf(self.alpha, ((np.unique(y[:, i]) - 1) * (len(np.unique(X)) - 1)))
+            if critical < statistic:
+                t_mi += mutual_info_score
         return statistic, critical, t_mi
 
     # the same function
@@ -895,7 +853,6 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             is_continuous = 'category' not in columns_type[attribute_index]
             if is_continuous:
                 attribute_data = list(X[:, attribute_index])
-                attribute_data = [round(num, 2) for num in attribute_data]
                 self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
                 data_class_array = list(zip(attribute_data, y))
                 data_class_array.sort(key=lambda tup: tup[0])
@@ -941,13 +898,13 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                     # convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
                     for record in partial_x:
                         record[chosen_attribute] = utils.find_split_position(value=record[chosen_attribute],
-                                                                        positions=chosen_split_points)
+                                                                             positions=chosen_split_points)
         # First layer
         else:
             # Convert each value in record[chosen_attribute] to a number between 0 and len(chosen_split_points)
             for record in partial_X:
                 record[chosen_attribute] = utils.find_split_position(value=record[chosen_attribute],
-                                                                positions=chosen_split_points)
+                                                                     positions=chosen_split_points)
 
     def _set_terminal_nodes(self, nodes, class_count):
         """ Connecting the given nodes to the terminal nodes in the network.
@@ -995,10 +952,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         error_rate = (np.size(y, 0) * np.size(y, 1) - correct) / (np.size(y, 0) * np.size(y, 1))
         return error_rate
 
-        # from sklearn.metrics import accuracy_score
-        # return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
-
-    def partial_fit(self, X, y=None, classes=None, sample_weight=None):
+    def partial_fit(self, X, y=None, num_of_classes=2, classes=None, sample_weight=None):
         """ Partially (incrementally) fit the model.
 
         Parameters
@@ -1008,6 +962,8 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
 
         y: {array-like, sparse matrix}, shape (n_samples, y_classes)
             Contains the true class labels for all the samples in X.
+
+        num_of_classes: number of target
 
         classes: Not used (default=None)
 
@@ -1020,24 +976,33 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
 
         """
         N, D = X.shape
+        isEnoughSamples = False
+
+        if self.i == 0:
+            self.X_batch = np.zeros((self.window_size, D))
+            self.y_batch = np.zeros((self.window_size, num_of_classes))
+            self.sample_weight = np.zeros(N)
+            self.i = 0
 
         for n in range(N):
             # For each instance ...
-            self.X_batch.append(X[n])
-            self.y_batch.append(y[n])
+            self.X_batch[self.i] = X[n]
+            self.y_batch[self.i] = y[n]
             # self.sample_weight[self.i] = sample_weight[n] if sample_weight else 1.0
             self.i = self.i + 1
+
             if self.i == self.window_size:
+                isEnoughSamples = True
                 # Train it
                 X_batch_df = pd.DataFrame(self.X_batch)
-                self.fit(X=X_batch_df, y=self.y_batch, classes=classes, sample_weight=sample_weight)
+                y_batch_df = pd.DataFrame(self.y_batch)
+                self.fit(X=X_batch_df, y=y_batch_df, classes=classes, sample_weight=sample_weight)
                 # Reset the window
                 self.i = 0
-                self.X_batch.clear()
-                self.y_batch.clear()
 
-        if not self.is_fitted_:
-            print("There are not enough samples to build a network")
+        # if not isEnoughSamples:
+        # TODO maybe change to return 0
+        # print("There are not enough samples to build a network")
 
         return self
 

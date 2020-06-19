@@ -156,7 +156,7 @@ def write_details_to_file(layer_position, attributes_cmi, chosen_attribute_index
             f.write(str(index) + ': ' + str(round(mi, 3)) + '\n')
 
         if chosen_attribute_index != -1:
-            f.write('\nChosen attribute is: ' + chosen_attribute + "(" + str(chosen_attribute_index) + ")" + '\n\n')
+            f.write('\nChosen attribute is: ' + str(chosen_attribute) + "(" + str(chosen_attribute_index) + ")" + '\n\n')
         else:
             f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute_index) + ")" + '\n\n')
         f.close()

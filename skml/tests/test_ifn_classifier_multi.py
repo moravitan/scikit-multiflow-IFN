@@ -10,6 +10,10 @@ import numpy as np
 import pandas as pd
 import shutil
 
+from sklearn import datasets
+
+alpha = 0.95
+
 # # data = pd.read_csv(r"skml/tests/datasets/music.csv")
 # data = "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit_multi.csv"
 # # y = data.iloc[:, :6]
@@ -79,45 +83,62 @@ import shutil
 #     print("accuracy:", accuracy_score(y_test, y_pred))
 #     assert accuracy_score(y_test, y_pred) == accuracy_score(y_test, loaded_y_pred)
 
-alpha = 0.95
+
+def test_chess():
+    clf = IfnClassifierMulti("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\", alpha)
+    dp = DataProcessorMulti()
+    x_train, x_test, y_train, y_test = dp.convert("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Chess_multi.csv",0.3)
+    clf.fit(x_train, y_train)
+    clf.predict(x_test)
+
+
+# test_chess()
 
 
 def test_internet_usage():
-    clf = IfnClassifierMulti(alpha)
+    clf = IfnClassifierMulti("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\", alpha)
     dp = DataProcessorMulti()
-    X, y = dp.convert("C:\\Users\\user\Desktop\פרויקט גמר\MultiFlow\IFN\Internet_Usage_multi\\final_general2.csv",0.1)
+    X, y = dp.convert("C:\\Users\\user\Desktop\פרויקט גמר\MultiFlow\IFN\Internet_Usage_multi\\final_general2_multi.csv",0.1)
     clf.fit(X, y)
     clf.network.create_network_structure_file(path="C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\network.txt")
 
+    assert clf.network.root_node.first_layer.index == 40
+    assert clf.network.root_node.first_layer.next_layer.index == 0
+    expected_train_accuracy = 0.21289614410357444
+    assert np.isclose(expected_train_accuracy, clf.training_error)
+    assert len(clf.network.root_node.first_layer.nodes) == 3
+    assert len(clf.network.root_node.first_layer.next_layer.nodes) == 185
 
-# test_internet_usage()
+
+test_internet_usage()
 
 
 def test_partial_fit():
-    stream = MultilabelGenerator(n_samples=100, n_features=20, n_targets=4, n_labels=4, random_state=0)
+    stream = MultilabelGenerator(n_samples=1000, n_features=20, n_targets=4, n_labels=4, random_state=0)
 
-    estimator = IfnClassifierMulti(alpha, multi_label=True, window_size=100)
+    estimator = IfnClassifierMulti("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\", alpha, multi_label=False, window_size=100)
     stream.prepare_for_use()
     X, y = stream.next_sample(100)
-    estimator.partial_fit(X, y, classes=stream.n_targets)
+    estimator.partial_fit(X, y, num_of_classes=stream.n_targets)
 
     cnt = 0
-    max_samples = 2000
-    predictions = []
-    true_labels = []
+    max_samples = 1000
+    predictions = {}
+    true_labels = {}
     wait_samples = 100
     correct_predictions = 0
 
     while cnt < max_samples:
+        # next sample return empty arrays
         X, y = stream.next_sample()
         # Test every n samples
         if (cnt % wait_samples == 0) and (cnt != 0):
-            predictions.append(estimator.predict(X)[0])
-            true_labels.append(y[0])
-            if np.array_equal(y[0], predictions[-1]):
+            # append to df
+            predictions[cnt] = (estimator.predict(X)).values
+            true_labels[cnt] = y[0]
+            if np.array_equal(predictions[cnt], true_labels[cnt]):
                 correct_predictions += 1
-
-        estimator.partial_fit(X, y)
+        estimator.partial_fit(X, y, num_of_classes=stream.n_targets)
         cnt += 1
 
     performance = correct_predictions / len(predictions)
@@ -134,12 +155,20 @@ def test_partial_fit():
 
 # test_partial_fit()
 
-def test_chess():
-    clf = IfnClassifierMulti(alpha)
-    dp = DataProcessorMulti()
-    x_train, x_test, y_train, y_test = dp.convert("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Chess_multi.csv",0.3)
-    clf.fit(x_train, y_train)
-    clf.predict(x_test)
 
+def test_iris_dataset():
+    clf = IfnClassifierMulti("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\", alpha)
+    iris = datasets.load_iris()
+    X = pd.DataFrame(data=iris['data'], columns=iris['feature_names'])
+    y = pd.DataFrame(iris.target)
 
-test_chess()
+    clf.fit(X, y)
+    expected_train_accuracy = 0.020000000000000018
+    assert np.isclose(expected_train_accuracy, clf.training_error)
+    assert len(clf.network.root_node.first_layer.nodes) == 4
+    assert len(clf.network.root_node.first_layer.next_layer.nodes) == 5
+    assert clf.network.root_node.first_layer.index == 2
+    assert clf.network.root_node.first_layer.next_layer.index == 3
+
+# test_iris_dataset()
+
