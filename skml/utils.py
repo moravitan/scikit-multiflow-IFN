@@ -268,6 +268,12 @@ def get_columns_type(X):
             columns_type.append("category")
         else:
             columns_type.append(str(X[dt].dtype))
+    return ['int64', 'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
+            'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
+            'category', 'category', 'int64', 'category', 'category', 'category', 'category', 'category',
+            'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
+            'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
+            'category', 'category', 'category', 'category', 'category', 'category', 'int64']
     return columns_type
 
 

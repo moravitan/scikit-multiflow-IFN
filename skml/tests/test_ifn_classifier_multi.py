@@ -104,13 +104,13 @@ def test_internet_usage():
 
     assert clf.network.root_node.first_layer.index == 40
     assert clf.network.root_node.first_layer.next_layer.index == 0
-    expected_train_accuracy = 0.21289614410357444
+    expected_train_accuracy = 0.3116521249648185
     assert np.isclose(expected_train_accuracy, clf.training_error)
     assert len(clf.network.root_node.first_layer.nodes) == 3
-    assert len(clf.network.root_node.first_layer.next_layer.nodes) == 185
+    assert len(clf.network.root_node.first_layer.next_layer.nodes) == 161
 
 
-test_internet_usage()
+# test_internet_usage()
 
 
 def test_partial_fit():
@@ -122,7 +122,7 @@ def test_partial_fit():
     estimator.partial_fit(X, y, num_of_classes=stream.n_targets)
 
     cnt = 0
-    max_samples = 1000
+    max_samples = 500
     predictions = {}
     true_labels = {}
     wait_samples = 100
@@ -134,28 +134,52 @@ def test_partial_fit():
         # Test every n samples
         if (cnt % wait_samples == 0) and (cnt != 0):
             # append to df
-            predictions[cnt] = (estimator.predict(X)).values
+            predictions[cnt] = (estimator.predict(X)).to_numpy()
             true_labels[cnt] = y[0]
-            if np.array_equal(predictions[cnt], true_labels[cnt]):
-                correct_predictions += 1
+            correct_predictions_targets = sum(predictions[cnt] == true_labels[cnt])
+            for i in range(0, len(correct_predictions_targets)):
+                if correct_predictions_targets[i] == 1:
+                    correct_predictions += 1
         estimator.partial_fit(X, y, num_of_classes=stream.n_targets)
         cnt += 1
 
-    performance = correct_predictions / len(predictions)
-    expected_predictions = [0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                            0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0]
+    performance = correct_predictions / (len(predictions.keys()) * stream.n_targets)
+    expected_predictions = {100: np.array([[0., 0., 0., 0.]]), 200: np.array([[1., 0., 0., 0.]]),
+                            300: np.array([[0., 1., 0., 0.]]), 400: np.array([[1., 0., 0., 0.]])}
 
-    expected_correct_predictions = 14
-    expected_performance = 0.7368421052631579
+    expected_correct_predictions = 7
+    expected_performance = 0.4375
 
-    assert np.alltrue(predictions == expected_predictions)
     assert np.isclose(expected_performance, performance)
     assert correct_predictions == expected_correct_predictions
+    for key in predictions.keys():
+        assert np.array_equal(predictions[key], expected_predictions[key])
+
+    print("finish check data stream")
 
 
-# test_partial_fit()
+test_partial_fit()
 
 
+# test multi for singel target credit, the same results
+def test_credit():
+    clf = IfnClassifierMulti("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\", alpha)
+    dp = DataProcessorMulti()
+    X, y = dp.convert("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit_full.csv",
+                      0.1)
+    clf.fit(X, y)
+
+    expected_train_accuracy = 0.17391304347826086
+    assert np.isclose(expected_train_accuracy, clf.training_error)
+    assert len(clf.network.root_node.first_layer.next_layer.nodes) == 30
+    assert clf.network.root_node.first_layer.index == 1
+    assert clf.network.root_node.first_layer.next_layer.index == 7
+
+
+# test_credit()
+
+
+# test multi for singel target iris dataSet, the same results
 def test_iris_dataset():
     clf = IfnClassifierMulti("C:\\Users\\user\PycharmProjects\scikit-multiflow-IFN\skml\\tests\\", alpha)
     iris = datasets.load_iris()
@@ -163,12 +187,11 @@ def test_iris_dataset():
     y = pd.DataFrame(iris.target)
 
     clf.fit(X, y)
-    expected_train_accuracy = 0.020000000000000018
+    expected_train_accuracy = 0.08
     assert np.isclose(expected_train_accuracy, clf.training_error)
-    assert len(clf.network.root_node.first_layer.nodes) == 4
+    assert len(clf.network.root_node.first_layer.nodes) == 43
     assert len(clf.network.root_node.first_layer.next_layer.nodes) == 5
     assert clf.network.root_node.first_layer.index == 2
-    assert clf.network.root_node.first_layer.next_layer.index == 3
+    assert clf.network.root_node.first_layer.next_layer.index == 0
 
 # test_iris_dataset()
-

@@ -153,11 +153,13 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             if global_chosen_attribute == -1:
                 if curr_node_index == 1:
                     print('No Nodes at the network. choose smaller alpha')
-                    sys.exit()
+                    return
+                    # sys.exit()
                 utils.write_details_to_file(layer_position=layer,
                                             attributes_cmi=attributes_mi,
                                             chosen_attribute_index=global_chosen_attribute,
                                             chosen_attribute=cols[global_chosen_attribute])
+
                 break
 
             nodes_list = []
@@ -172,7 +174,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                                              partial_X=X)
 
             # Create new hidden layer of the maximal mutual information attribute and set the layer nodes
-            un_significant_nodes = []
+            insignificant_nodes = []
             if current_layer is not None:
                 node_index = 0
                 for node in current_layer.get_nodes():
@@ -204,7 +206,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                             curr_node_index += 1
                     # If the node isn't significant we will set it as terminal node later
                     else:
-                        un_significant_nodes.append(node)
+                        insignificant_nodes.append(node)
             # First layer
             else:
                 prev_node = 0
@@ -233,9 +235,9 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                 next_layer.split_points = chosen_split_points
 
             # Set the un significant node as terminal nodes
-            un_significant_nodes_set = list(set(un_significant_nodes))
-            if len(un_significant_nodes_set) > 0:
-                self._set_terminal_nodes(un_significant_nodes_set, self.class_count)
+            insignificant_nodes_set = list(set(insignificant_nodes))
+            if len(insignificant_nodes_set) > 0:
+                self._set_terminal_nodes(insignificant_nodes_set, self.class_count)
 
             current_layer = next_layer
             number_of_layers += 1
@@ -396,6 +398,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                             curr_layer = curr_layer.next_layer
                             prev_node_index = chosen_node.index
                         break
+
                     iteration_number += 1
         predicted_df = pd.DataFrame.from_dict(predicted)
         predicted_df.to_csv(self.file_path + 'predict_prob_multi.csv')
@@ -495,17 +498,19 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         """
 
         node_mi = 0
+        sum_statistic = 0
         attribute_data = list(X[:, attribute_index])
         self.unique_values_per_attribute[attribute_index] = np.unique(attribute_data)
         for i in range(0, np.size(y, 1)):
             mutual_info_score = self._calculate_conditional_mutual_information(attribute_data, y[:, i])
-            # mark - to ask about total record / len(attribute data)
-            statistic = 2 * np.log(2) * self.total_records * mutual_info_score
+            y_target = list(y[:, i])
+            statistic = self._calculate_statistic(attribute_data, y_target)
+
+            # statistic = 2 * np.log(2) * self.total_records * mutual_info_score
             critical = stats.chi2.ppf(self.alpha, (len(np.unique(y[:, i])) - 1) *
                                       (len(self.unique_values_per_attribute[attribute_index]) - 1))
 
             if critical < statistic:
-                # sum mutual information overall nodes
                 if attribute_index in attributes_mi.keys():
                     attributes_mi[attribute_index] += mutual_info_score
                 else:
@@ -516,6 +521,37 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                     attributes_mi[attribute_index] = 0
 
         return node_mi
+
+    def _calculate_statistic(self, x, y):
+        partial_records = len(y)
+        # count the number of classes (0 and 1)
+        unique, counts = np.unique(np.array(y), return_counts=True)
+        # <class, number_of_appearances>
+        class_count = dict(zip(unique, counts))
+        # count the number of distinct values in x
+        unique, counts = np.unique(np.array(x), return_counts=True)
+        # <value, number_of_appearances>
+        data_count = dict(zip(unique, counts))
+
+        data_dic = collections.defaultdict(int)
+
+        # Count the number of appearances for each tuple x[i],y[i]
+        for i in range(len(y)):
+            data_dic[x[i], y[i]] = data_dic[x[i], y[i]] + 1
+
+        statistic_sum = 0
+        for key, value in data_dic.items():
+            # Get the total number of class appearances
+            curr_class_count = class_count[key[1]]
+            # Get the total number of feature value appearances
+            e_z = data_count[key[0]]
+
+            p_y = curr_class_count / partial_records
+
+            statistic = value * np.log(value / (p_y * e_z))
+            statistic_sum += statistic
+
+        return 2*statistic_sum
 
     # the same function
     def _choose_split_numeric_attribute(self, attribute_index, attributes_mi, nodes=None):
@@ -563,7 +599,6 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
 
         return splitted_nodes
 
-    # the same function
     def _discretization(self, attribute_index, interval, total_mi=None, nodes=None, prev_split_points=None):
         """ A recursive implementation of a discretization of the IFN algorithm according to the algorithm
             published in "Maimon, Oded, and Mark Last. "Knowledge discovery and data mining." Klewer Pub. Co (2001)."
@@ -620,17 +655,18 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         for T in iterator:
             if T in self.split_points[attribute_index]: continue
             if nodes is None:
-                t_attribute_date, new_y = utils.split_data_to_two_intervals(interval=interval,
+                t_attribute_date, new_y = self.split_data_to_two_intervals(interval=interval,
                                                                             T=T,
                                                                             min_value=min_value,
                                                                             max_value=max_value)
                 if len(np.unique(t_attribute_date)) != 2:
                     break
+                t_mi = 0
                 statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
                                                                                                 y=new_y)
 
                 # T in attribute is a possible split point
-                if critical < statistic:
+                if t_mi > 0:
                     # For each point save it's mutual information
                     split_point_mi_map[T] = t_mi
             else:
@@ -640,19 +676,20 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                     attribute_data = list(partial_X[:, attribute_index])
                     data_class_array = list(zip(attribute_data, partial_y))
 
-                    t_attribute_date, new_y = utils.split_data_to_two_intervals(interval=data_class_array,
+                    t_attribute_date, new_y = self.split_data_to_two_intervals(interval=data_class_array,
                                                                                 T=T,
                                                                                 min_value=min_value,
                                                                                 max_value=max_value)
 
                     if len(np.unique(t_attribute_date)) != 2:
                         continue
+                    t_mi = 0
 
                     statistic, critical, t_mi = self._calculate_statistic_and_critical_for_interval(X=t_attribute_date,
                                                                                                     y=new_y)
 
                     # T in attribute is a possible split point
-                    if critical < statistic:
+                    if t_mi > 0:
                         # for each point save it's mutual information
                         if node.index not in node_mi_per_threshold.keys():
                             node_mi_per_threshold[node.index] = {}
@@ -726,9 +763,9 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         critical = 0
         statistic = 0
         for i in range(0, np.size(y, 1)):
-            mutual_info_score = self._calculate_conditional_mutual_information(x=X, y=y[:, i])
-            statistic = 2 * np.log(2) * self.total_records * mutual_info_score
-            critical = stats.chi2.ppf(self.alpha, ((np.unique(y[:, i]) - 1) * (len(np.unique(X)) - 1)))
+            mutual_info_score = self._calculate_conditional_mutual_information(X, y[:, i])
+            statistic = self._calculate_statistic(X, list(y[:, i]))
+            critical = stats.chi2.ppf(self.alpha, ((len(np.unique(y[:, i])) - 1) * (len(np.unique(X)) - 1)))
             if critical < statistic:
                 t_mi += mutual_info_score
         return statistic, critical, t_mi
@@ -1006,3 +1043,49 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
 
         return self
 
+    def split_data_to_two_intervals(self, interval, T, min_value, max_value):
+        """ Splitting the given interval to two intervals contains only the number between min_value and max_value.
+            One interval contains all the data which is smaller than T (will be referred as left interval).
+            while the second interval contain all the data which is equal or larger than T (will be referred as right
+            interval)
+
+        Parameters
+        ----------
+        interval: {array-like, sparse matrix}, shape (1_sample, n_classes)
+            Contains the data of one feature overall samples in the train set.
+
+        T: int or float
+            Threshold point
+
+        min_value: int or float
+            minimum value in the interval
+
+        max_value: int or float
+            maximum value in the interval
+
+        Returns
+        -------
+            An array_like object of length n_samples contains 0's equal to the number of values which are smaller than
+            T and 1's equal to the number of values which are equal of larger than T.
+            An array_like object of length n_samples which contains the true class labels for all the samples in the
+            interval.
+        """
+        if interval is None:
+            raise ValueError("interval shouldn't be None")
+
+        t_attribute_data = []
+        new_y = []
+
+        interval.sort(key=lambda tup: tup[0])
+
+        for data_class_tuple in interval:
+            if min_value <= data_class_tuple[0] <= max_value:
+                new_y.append(data_class_tuple[1])
+                if data_class_tuple[0] < T:
+                    t_attribute_data.append(0)
+                else:
+                    t_attribute_data.append(1)
+
+        new_y = pd.DataFrame(new_y).to_numpy()
+
+        return t_attribute_data, new_y
