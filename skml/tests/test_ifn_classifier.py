@@ -14,7 +14,8 @@ alpha = 0.95
 
 
 def test_iris_dataset():
-    clf = IfnClassifier(alpha)
+    columns_type = ['int64','int64','int64','int64']
+    clf = IfnClassifier(columns_type=columns_type, alpha=alpha)
     iris = datasets.load_iris()
     X = pd.DataFrame(data=iris['data'], columns=iris['feature_names'])
     y = iris.target
@@ -30,7 +31,9 @@ def test_iris_dataset():
 
 
 def test_credit():
-    clf = IfnClassifier(alpha)
+    columns_type = ['category','int64','int64','category','category','category','int64','category','category','int64',
+                    'category','category','int64', 'int64']
+    clf = IfnClassifier(columns_type=columns_type, alpha=alpha)
     dp = DataProcessor()
     X, y = dp.convert("C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests\datasets\Credit_full.csv",
                       0.1)
@@ -47,12 +50,15 @@ def test_credit():
     assert clf.network.root_node.first_layer.next_layer.index == 2
 
 def test_model_pickle_stream_dataset(tmpdir):
-    clf = IfnClassifier(alpha)
+    columns_type = ['int64','int64','int64','int64', 'int64', 'int64', 'int64', 'int64', 'int64', 'int64',
+                    'int64','int64','int64','int64']
+    clf = IfnClassifier(columns_type=columns_type, alpha=alpha)
     stream = RandomTreeGenerator(tree_random_state=112,
                                  sample_random_state=112,
                                  n_num_features=3,
                                  n_categories_per_cat_feature=2)
     x_train, y_train = stream.next_sample(100)
+    print(x_train)
     x_test, y_test = stream.next_sample(100)
     X_train_df = pd.DataFrame(x_train)
 
@@ -73,12 +79,14 @@ def test_model_pickle_stream_dataset(tmpdir):
 
 
 def test_partial_fit():
+    columns_type = ['int64','int64','int64','int64', 'int64', 'int64', 'int64', 'int64', 'int64', 'int64',
+                    'int64','int64','int64','int64']
     stream = RandomTreeGenerator(tree_random_state=112,
                                  sample_random_state=112,
                                  n_num_features=3,
                                  n_categories_per_cat_feature=2)
 
-    estimator = IfnClassifier(alpha, window_size=100)
+    estimator = IfnClassifier(columns_type, alpha, window_size=100)
 
     X, y = stream.next_sample(100)
     estimator.partial_fit(X, y)

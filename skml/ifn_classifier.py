@@ -24,14 +24,20 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
 
     Parameters
     ----------
+    columns_type: list
+        List of the columns type in the X data the classifier will receive.
+        the list should contain strings only. 'category' or 'int64'
     alpha: float, default='0.99'
         A parameter used for the significance level of the likelihood-ratio tests.
 
     max_number_of_layers: int, default=math.inf
         The maximum number of layers the network will have.
+
+    window_size: int, default=100
+        The window size for stream
     """
 
-    def __init__(self, alpha=0.99, max_number_of_layers=math.inf, window_size=100):
+    def __init__(self, columns_type, alpha=0.99, max_number_of_layers=math.inf, window_size=100):
         if 0 <= alpha < 1:
             self.alpha = alpha
             self.max_number_of_layers = max_number_of_layers
@@ -40,6 +46,7 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
             self.y_batch = []
             self.i = 0
             self.is_fitted = False
+            self.columns_type = columns_type
             self.training_error = 0
             self.cmi_sec_best_att = 0
             self.index_of_sec_best_att = 0
@@ -91,8 +98,6 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
         cols = list(X.columns.values)
         cols = [str(i) for i in cols]
 
-        columns_type = utils.get_columns_type(X)
-
         X, y = check_X_y(X, y, accept_sparse=True)
         X_copy = X.copy()
         y_copy = y.copy()
@@ -113,7 +118,8 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
         self.network.build_target_layer(unique)
 
         # Define for each numeric attribute it's interval for the discretization procedure
-        self.intervals_per_attribute = self._define_interval_for_numeric_feature(X, y, attributes_indexes, columns_type)
+        self.intervals_per_attribute = self._define_interval_for_numeric_feature(X, y, attributes_indexes,
+                                                                                 self.columns_type)
 
         significant_attributes_per_node = {}
 
@@ -132,13 +138,13 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
             if current_layer is not None:
                 global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
                     self._choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                 columns_type=columns_type,
+                                                 columns_type=self.columns_type,
                                                  nodes=current_layer.get_nodes())
             # first layer
             else:
                 global_chosen_attribute, attributes_mi, not_relevant = \
                     self._choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                 columns_type=columns_type,
+                                                 columns_type=self.columns_type,
                                                  X=X,
                                                  y=y)
 
@@ -157,7 +163,7 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
 
             nodes_list = []
 
-            is_continuous = 'category' not in columns_type[global_chosen_attribute]
+            is_continuous = 'category' not in self.columns_type[global_chosen_attribute]
             # if chosen attribute is continuous we convert the partial x values by the splits values
             if is_continuous:
                 chosen_split_points = self.split_points[global_chosen_attribute]
@@ -267,7 +273,7 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
             utils.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
 
-        if self.index_of_sec_best_att != -1 and 'category' not in columns_type[self.index_of_sec_best_att]:
+        if self.index_of_sec_best_att != -1 and 'category' not in self.columns_type[self.index_of_sec_best_att]:
             self.sec_att_split_points = self.split_points[self.index_of_sec_best_att]
 
         self.split_points.clear()
@@ -318,13 +324,13 @@ class IfnClassifier(BaseSKMObject, ClassifierMixin):
                 isEnoughSamples = True
                 # Train it
                 X_batch_df = pd.DataFrame(self.X_batch)
-                self.fit(X=X_batch_df, y=self.y_batch,classes=classes, sample_weight=sample_weight)
+                self.fit(X=X_batch_df, y=self.y_batch, classes=classes, sample_weight=sample_weight)
                 # Reset the window
                 self.i = 0
 
         # if not isEnoughSamples:
-            # TODO maybe change to return 0
-            # print("There are not enough samples to build a network")
+        # TODO maybe change to return 0
+        # print("There are not enough samples to build a network")
 
         return self
 

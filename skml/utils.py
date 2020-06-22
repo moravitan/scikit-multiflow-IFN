@@ -264,16 +264,11 @@ def get_columns_type(X):
 
     columns_type = []
     for dt in X.columns:
-        if len(np.unique(X[dt])) / len(X) < 0.03:
-            columns_type.append("category")
-        else:
+        if len(np.unique(X[dt])) > 10:
             columns_type.append(str(X[dt].dtype))
-    return ['int64', 'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
-            'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
-            'category', 'category', 'int64', 'category', 'category', 'category', 'category', 'category',
-            'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
-            'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category', 'category',
-            'category', 'category', 'category', 'category', 'category', 'category', 'int64']
+        else:
+            columns_type.append("category")
+
     return columns_type
 
 

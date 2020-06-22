@@ -31,7 +31,8 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         The maximum number of layers the network will have.
     """
 
-    def __init__(self, file_path, alpha=0.99, multi_label=False, max_number_of_layers=math.inf, window_size=100):
+    def __init__(self, columns_type, file_path, alpha=0.99, multi_label=False, max_number_of_layers=math.inf,
+                 window_size=100):
         if 0 <= alpha < 1:
             self.max_number_of_layers = max_number_of_layers
             self.window_size = window_size
@@ -39,6 +40,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             self.y_batch = []
             self.i = 0
             self.alpha = alpha
+            self.columns_type = columns_type
             self.max_number_of_layers = max_number_of_layers
             self.total_records = 0
             self.cmi_sec_best_att = 0
@@ -97,7 +99,6 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         cols = list(X.columns.values)
         cols = [str(i) for i in cols]
 
-        columns_type = utils.get_columns_type(X)
         self.y_cols = list(y.columns.values)
         X, y = check_X_y(X, y, accept_sparse=True, multi_output=True)
         X_copy = X.copy()
@@ -120,7 +121,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         last_layer_mi = {}
 
         # Define for each numeric attribute it's interval for the discretization procedure
-        self.intervals_per_attribute = self._define_interval_for_numeric_feature(X, y, attributes_indexes, columns_type)
+        self.intervals_per_attribute = self._define_interval_for_numeric_feature(X, y, attributes_indexes, self.columns_type)
 
         significant_attributes_per_node = {}
 
@@ -139,13 +140,13 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             if current_layer is not None:
                 global_chosen_attribute, attributes_mi, significant_attributes_per_node = \
                     self._choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                 columns_type=columns_type,
+                                                 columns_type=self.columns_type,
                                                  nodes=current_layer.get_nodes())
             # first layer
             else:
                 global_chosen_attribute, attributes_mi, not_relevant = \
                     self._choose_split_attribute(attributes_indexes=attributes_indexes,
-                                                 columns_type=columns_type,
+                                                 columns_type=self.columns_type,
                                                  X=X,
                                                  y=y)
 
@@ -164,7 +165,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
 
             nodes_list = []
 
-            is_continuous = 'category' not in columns_type[global_chosen_attribute]
+            is_continuous = 'category' not in self.columns_type[global_chosen_attribute]
             # if chosen attribute is continuous we convert the partial x values by the splits values
             if is_continuous:
                 chosen_split_points = self.split_points[global_chosen_attribute]
@@ -275,7 +276,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
         self.index_of_sec_best_att, self.cmi_sec_best_att = \
             utils.calculate_second_best_attribute_of_last_layer(attributes_mi=last_layer_mi)
 
-        if self.index_of_sec_best_att != -1 and 'category' not in columns_type[self.index_of_sec_best_att]:
+        if self.index_of_sec_best_att != -1 and 'category' not in self.columns_type[self.index_of_sec_best_att]:
             self.sec_att_split_points = self.split_points[self.index_of_sec_best_att]
 
         self.split_points.clear()
@@ -313,9 +314,10 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                 possible_nodes = [node for node in curr_layer.nodes if node.prev_node == prev_node_index]
                 iteration_number = 1
                 for node in possible_nodes:
-                    if node.attribute_value == record_value or \
-                            (iteration_number == len(possible_nodes) and node.attribute_value + 1 == record_value) or \
-                            (iteration_number == 1 and node.attribute_value - 1 == record_value):
+                    if int(node.attribute_value) == record_value or \
+                            (iteration_number == len(possible_nodes)) or \
+                            (iteration_number == 1 and int(node.attribute_value) - 1 == record_value) or \
+                            (iteration_number == record_value == int(node.attribute_value) + 1):
                         chosen_node = node
                         if chosen_node.is_terminal:
                             for key in chosen_node.weight_probability_pair.keys():
@@ -551,7 +553,7 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             statistic = value * np.log(value / (p_y * e_z))
             statistic_sum += statistic
 
-        return 2*statistic_sum
+        return 2 * statistic_sum
 
     # the same function
     def _choose_split_numeric_attribute(self, attribute_index, attributes_mi, nodes=None):
@@ -656,9 +658,9 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
             if T in self.split_points[attribute_index]: continue
             if nodes is None:
                 t_attribute_date, new_y = self.split_data_to_two_intervals(interval=interval,
-                                                                            T=T,
-                                                                            min_value=min_value,
-                                                                            max_value=max_value)
+                                                                           T=T,
+                                                                           min_value=min_value,
+                                                                           max_value=max_value)
                 if len(np.unique(t_attribute_date)) != 2:
                     break
                 t_mi = 0
@@ -677,9 +679,9 @@ class IfnClassifierMulti(BaseSKMObject, ClassifierMixin):
                     data_class_array = list(zip(attribute_data, partial_y))
 
                     t_attribute_date, new_y = self.split_data_to_two_intervals(interval=data_class_array,
-                                                                                T=T,
-                                                                                min_value=min_value,
-                                                                                max_value=max_value)
+                                                                               T=T,
+                                                                               min_value=min_value,
+                                                                               max_value=max_value)
 
                     if len(np.unique(t_attribute_date)) != 2:
                         continue
