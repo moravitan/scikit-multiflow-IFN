@@ -42,7 +42,7 @@ def test_internet_usage():
 def test_partial_fit():
     columns_type = ['int64', 'int64', 'int64', 'int64', 'int64', 'int64', 'int64']
 
-    stream = MultilabelGenerator(n_features=7, n_targets=4, random_state=2)
+    stream = MultilabelGenerator(n_features=5, n_targets=3, random_state=2)
 
     estimator = IfnClassifierMulti(columns_type,
                                    "C:\\Users\איתן אביטן\PycharmProjects\scikit-multiflow-IFN\skml\\tests", alpha,
@@ -76,8 +76,8 @@ def test_partial_fit():
         cnt += 1
 
     performance = correct_predictions / (len(predictions.keys()) * stream.n_targets)
-    expected_predictions = {100: np.array([[0., 0., 0., 0., ]]), 200: np.array([[1., 0., 0., 0.]]),
-                            300: np.array([[0., 1., 0., 0.]]), 400: np.array([[1., 0., 0., 0.]])}
+    expected_predictions = {100: np.array([[1., 1., 0.]]), 200: np.array([[1., 1., 0.]]),
+                            300: np.array([[1., 0., 0.]]), 400: np.array([[0., 0., 0.]])}
 
     expected_correct_predictions = 7
     expected_performance = 0.5833333333333334
