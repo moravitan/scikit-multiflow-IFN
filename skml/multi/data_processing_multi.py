@@ -21,8 +21,9 @@ class DataProcessorMulti:
         X = df[df.columns.drop(list(df.filter(regex='Class')))]
         # X = df.drop(['Class'], axis=1)
         # multi manual
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
-        return X_train, X_test, y_train, y_test
+        # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+        # return X_train, X_test, y_train, y_test
+        return X, y
 
     def _data_processing(self, df):
         """

@@ -156,7 +156,7 @@ def write_details_to_file(layer_position, attributes_cmi, chosen_attribute_index
             f.write(str(index) + ': ' + str(round(mi, 3)) + '\n')
 
         if chosen_attribute_index != -1:
-            f.write('\nChosen attribute is: ' + chosen_attribute + "(" + str(chosen_attribute_index) + ")" + '\n\n')
+            f.write('\nChosen attribute is: ' + str(chosen_attribute) + "(" + str(chosen_attribute_index) + ")" + '\n\n')
         else:
             f.write('\nChosen attribute is: None' + "(" + str(chosen_attribute_index) + ")" + '\n\n')
         f.close()
@@ -264,10 +264,11 @@ def get_columns_type(X):
 
     columns_type = []
     for dt in X.columns:
-        if len(np.unique(X[dt])) / len(X) < 0.03:
-            columns_type.append("category")
-        else:
+        if len(np.unique(X[dt])) > 10:
             columns_type.append(str(X[dt].dtype))
+        else:
+            columns_type.append("category")
+
     return columns_type
 
 
